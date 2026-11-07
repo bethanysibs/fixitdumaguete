@@ -35,7 +35,7 @@ class DemoMarketplaceSeeder extends Seeder
                 [
                     'name' => $worker['name'],
                     'role' => 'worker',
-                    'password' => Str::password(32),
+                    'password' => 'password',
                     'email_verified_at' => now(),
                 ],
             );
