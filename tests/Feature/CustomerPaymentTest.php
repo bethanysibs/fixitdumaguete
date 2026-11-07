@@ -47,21 +47,23 @@ class CustomerPaymentTest extends TestCase
             ->assertOk()
             ->assertSee('Extra work')
             ->assertSee('₱200.00')
-            ->assertSee('₱20.00')
+            ->assertSee('₱850.00')
+            ->assertSee('₱1,050.00')
+            ->assertSee('₱105.00')
             ->assertSee('Still to pay')
             ->assertSee('Account details have not been added yet.')
-            ->assertSee('Submit a payment claim')
+            ->assertSee('Pay the deposit')
             ->assertDontSee('Payment recorded.');
 
         $this->actingAs($customer)
             ->get(route('bookings.payments.create', $booking))
             ->assertOk()
-            ->assertSee('Submit claim for review');
+            ->assertSee('Send receipt for checking');
 
         $this->actingAs($customer)
             ->get(route('bookings.show', $booking))
             ->assertOk()
-            ->assertSee('Submit a payment');
+            ->assertSee('Payments');
 
         $this->actingAs($other)->get(route('bookings.payments.index', $booking))->assertForbidden();
         $this->actingAs($other)->get(route('bookings.payments.create', $booking))->assertForbidden();
@@ -99,9 +101,9 @@ class CustomerPaymentTest extends TestCase
             ->assertRedirect(route('bookings.payments.index', $booking))
             ->assertSessionHas('success');
 
-        $payment = Payment::query()->where('booking_id', $booking->id)->whereNotNull('quotation_id')->firstOrFail();
-        $this->assertSame($quotation->id, $payment->quotation_id);
-        $this->assertSame(1, $payment->quotation_version);
+        $payment = Payment::query()->where('booking_id', $booking->id)->firstOrFail();
+        $this->assertNull($payment->quotation_id);
+        $this->assertNull($payment->quotation_version);
         $this->assertSame($customer->id, $payment->customer_id);
         $this->assertSame($customer->id, $payment->submitted_by);
         $this->assertSame('deposit', $payment->payment_type);
@@ -134,7 +136,7 @@ class CustomerPaymentTest extends TestCase
         $this->actingAs($customer)
             ->post(route('bookings.payments.store', $booking), $this->claim([
                 'payment_type' => 'balance',
-                'amount' => '1.00',
+                'amount' => '900.00',
                 'payment_reference' => 'BANK 2003',
             ]))
             ->assertSessionHasErrors('amount');
@@ -150,8 +152,8 @@ class CustomerPaymentTest extends TestCase
 
         $summary = app(PaymentCalculator::class)->summarize($booking->refresh());
         $this->assertSame(0, $summary['verified_cents']);
-        $this->assertSame(2000, $summary['deposit_outstanding_cents']);
-        $this->assertSame(20000, $summary['balance_outstanding_cents']);
+        $this->assertSame(10500, $summary['deposit_outstanding_cents']);
+        $this->assertSame(105000, $summary['balance_outstanding_cents']);
         $this->assertSame($financial, $this->financial($booking));
 
         $full = $this->acceptedQuotation();
@@ -159,19 +161,19 @@ class CustomerPaymentTest extends TestCase
         $this->actingAs($customer)
             ->post(route('bookings.payments.store', $full), $this->claim([
                 'payment_type' => 'full_payment',
-                'amount' => '200.00',
+                'amount' => '1050.00',
                 'payment_reference' => 'FULL 3003',
             ]))
             ->assertRedirect();
         $this->actingAs($customer)
             ->post(route('bookings.payments.store', $full), $this->claim([
                 'payment_type' => 'full_payment',
-                'amount' => '50.00',
+                'amount' => '200.00',
                 'payment_reference' => 'FULL 3004',
             ]))
             ->assertSessionHasErrors('amount');
 
-        $fullPayment = Payment::query()->where('booking_id', $full->id)->whereNotNull('quotation_id')->firstOrFail();
+        $fullPayment = Payment::query()->where('booking_id', $full->id)->firstOrFail();
         $this->assertSame('full_payment', $fullPayment->payment_type);
         $this->assertSame('submitted', $fullPayment->status);
         $this->assertSame('pending_review', $fullPayment->verification_status);
@@ -190,12 +192,12 @@ class CustomerPaymentTest extends TestCase
             ->post(route('bookings.payments.store', $booking), $this->claim(['amount' => '0.00']))
             ->assertSessionHasErrors('amount');
         $this->actingAs($customer)
-            ->post(route('bookings.payments.store', $booking), $this->claim(['amount' => '21.00']))
+            ->post(route('bookings.payments.store', $booking), $this->claim(['amount' => '106.00']))
             ->assertSessionHasErrors('amount');
         $this->actingAs($customer)
             ->post(route('bookings.payments.store', $booking), $this->claim([
                 'payment_type' => 'balance',
-                'amount' => '250.00',
+                'amount' => '2000.00',
                 'payment_reference' => 'OVER 1002',
             ]))
             ->assertSessionHasErrors('amount');
@@ -244,7 +246,7 @@ class CustomerPaymentTest extends TestCase
             ->post(route('bookings.payments.store', $booking), $this->claim(['payment_reference' => 'HIDE 1007']))
             ->assertSessionHasErrors('method');
 
-        $this->assertSame(0, Payment::query()->where('booking_id', $booking->id)->whereNotNull('quotation_id')->count());
+        $this->assertSame(0, Payment::query()->where('booking_id', $booking->id)->count());
     }
 
     public function test_payment_proof_stays_private(): void
@@ -273,7 +275,7 @@ class CustomerPaymentTest extends TestCase
             ]))
             ->assertRedirect();
 
-        $payment = Payment::query()->where('booking_id', $booking->id)->whereNotNull('quotation_id')->firstOrFail();
+        $payment = Payment::query()->where('payment_reference', 'PROOF 4004')->firstOrFail();
         $proof = PaymentProof::query()->where('payment_id', $payment->id)->firstOrFail();
         $this->assertSame('local', $proof->disk());
         $this->assertMatchesRegularExpression('#^payment-proofs/\d+/[0-9a-f-]{36}\.jpg$#', $proof->file_path);
@@ -321,7 +323,7 @@ class CustomerPaymentTest extends TestCase
             ->get(route('bookings.payments.index', $booking))
             ->assertOk()
             ->assertSee('The receipt is unreadable.')
-            ->assertSee('Rejected')
+            ->assertSee('Payment rejected')
             ->assertSee('REJECT 5005')
             ->assertDontSee('Payment recorded.');
 
@@ -378,17 +380,20 @@ class CustomerPaymentTest extends TestCase
                 'quotation_id' => $accepted->id,
                 'status' => 'paid',
             ]))
-            ->assertSessionHasErrors('quotation');
+            ->assertRedirect();
 
         $accepted->refresh();
         $old = Payment::query()->where('payment_reference', 'OLD 6006')->firstOrFail();
+        $duringRevision = Payment::query()->where('payment_reference', 'NEW 6007')->firstOrFail();
         $this->assertSame('approved', $accepted->status);
         $this->assertSame('200.00', $accepted->total_amount);
-        $this->assertSame($accepted->id, $old->quotation_id);
-        $this->assertSame(1, $old->quotation_version);
+        $this->assertNull($old->quotation_id);
+        $this->assertNull($old->quotation_version);
         $this->assertSame('20.00', $old->amount);
         $this->assertSame('submitted', $old->status);
-        $this->assertNull(Payment::query()->where('payment_reference', 'NEW 6007')->first());
+        $this->assertSame('submitted', $duringRevision->status);
+        $this->assertSame('pending_review', $duringRevision->verification_status);
+        $this->assertNull($duringRevision->quotation_id);
 
         $this->actingAs($admin)->post(route('admin.quotations.approve', $booking))->assertRedirect();
         $revised->refresh();
@@ -400,20 +405,20 @@ class CustomerPaymentTest extends TestCase
         $this->actingAs($customer)
             ->post(route('bookings.payments.store', $booking), $this->claim([
                 'amount' => '8.00',
-                'payment_reference' => 'NEW 6007',
+                'payment_reference' => 'NEW 6008',
                 'quotation_id' => $accepted->id,
                 'total_amount' => '1.00',
                 'status' => 'verified',
             ]))
             ->assertRedirect();
 
-        $fresh = Payment::query()->where('payment_reference', 'NEW 6007')->firstOrFail();
-        $this->assertSame($revised->id, $fresh->quotation_id);
-        $this->assertSame(2, $fresh->quotation_version);
+        $fresh = Payment::query()->where('payment_reference', 'NEW 6008')->firstOrFail();
+        $this->assertNull($fresh->quotation_id);
+        $this->assertNull($fresh->quotation_version);
         $this->assertSame('8.00', $fresh->amount);
         $this->assertSame('submitted', $fresh->status);
         $this->assertSame('pending_review', $fresh->verification_status);
-        $this->assertSame($accepted->id, $old->refresh()->quotation_id);
+        $this->assertNull($old->refresh()->quotation_id);
         $this->assertSame('20.00', $old->amount);
         $this->assertSame($financial, $this->financial($booking->refresh()));
         $this->assertSame('pending', $booking->status);

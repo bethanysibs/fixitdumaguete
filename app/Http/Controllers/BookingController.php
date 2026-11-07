@@ -151,7 +151,7 @@ class BookingController extends Controller
             'customerCanReviewQuotation' => $request->user()->id === $booking->customer_id
                 && $booking->quotations()->whereIn('status', ['admin_approved', 'approved', 'customer_rejected'])->exists(),
             'customerCanPayQuotation' => $request->user()->id === $booking->customer_id
-                && $booking->currentQuotations()->where('status', 'approved')->whereNotNull('customer_approved_at')->exists(),
+                && ($booking->allowsNewQuotation() || $booking->payments()->exists()),
         ]);
     }
 

@@ -102,28 +102,33 @@ class Payment extends Model
 
     public function customerStatusLabel(): string
     {
+        if ($this->countsAsVerified()) {
+            return 'Paid';
+        }
+
+        if ($this->status === 'rejected' || $this->verification_status === 'rejected') {
+            return 'Payment rejected';
+        }
+
+        if ($this->status === 'submitted' || $this->verification_status === 'pending_review') {
+            return 'Waiting for verification';
+        }
+
+        if (in_array($this->status, ['paid', 'pending'], true)) {
+            return 'Recorded on the platform';
+        }
+
         return match ($this->status) {
-            'submitted' => 'Submitted',
-            'pending' => 'Pending',
-            'verified' => 'Verified',
-            'rejected' => 'Rejected',
             'cancelled' => 'Cancelled',
             'refunded' => 'Refunded',
             'partially_refunded' => 'Partly refunded',
-            'paid' => 'Recorded',
-            default => (string) $this->status,
+            default => 'Payment',
         };
     }
 
     public function customerVerificationLabel(): string
     {
-        return match ($this->verification_status) {
-            'pending_review' => 'Waiting for review',
-            'not_submitted' => 'Not submitted',
-            'verified' => 'Verified',
-            'rejected' => 'Rejected',
-            default => (string) $this->verification_status,
-        };
+        return $this->customerStatusLabel();
     }
 
     public function formattedAmount(): string

@@ -10,17 +10,31 @@ use Illuminate\Support\Collection;
 
 class PaymentCalculator
 {
-    public function __construct(private DepositCalculator $deposits) {}
+    public function __construct(
+        private DepositCalculator $deposits,
+        private ContractAmountCalculator $contracts,
+    ) {}
 
     /**
+     * Payments are settled against the whole booking contract.
+     * Only verified payments reduce the outstanding balance.
+     * Pending claims reserve room for the next submission and do not reduce that balance.
+     *
      * @return array{
-     *     quotation_id: int|null,
-     *     quotation_version: int|null,
-     *     accepted_amount_cents: int|null,
+     *     quotation_id: null,
+     *     quotation_version: null,
+     *     accepted_amount_cents: int,
+     *     contract_cents: int,
      *     verified_cents: int,
+     *     pending_cents: int,
+     *     rejected_cents: int,
+     *     recorded_cents: int,
      *     required_deposit_cents: int,
+     *     original_deposit_cents: int,
+     *     additional_deposit_cents: int,
      *     deposit_outstanding_cents: int,
-     *     balance_outstanding_cents: int|null,
+     *     balance_outstanding_cents: int,
+     *     eligible_cents: int,
      *     requirements_met: bool,
      *     paid_in_full: bool,
      *     accepted_count: int
@@ -28,45 +42,42 @@ class PaymentCalculator
      */
     public function summarize(Booking $booking): array
     {
-        $accepted = $this->currentAccepted($booking);
-        $quotation = $accepted->count() === 1 ? $accepted->first() : null;
-
-        if ($quotation === null) {
-            return [
-                'quotation_id' => null,
-                'quotation_version' => null,
-                'accepted_amount_cents' => null,
-                'verified_cents' => 0,
-                'required_deposit_cents' => 0,
-                'deposit_outstanding_cents' => 0,
-                'balance_outstanding_cents' => null,
-                'requirements_met' => false,
-                'paid_in_full' => false,
-                'accepted_count' => $accepted->count(),
-            ];
-        }
-
-        $deposit = $this->deposits->calculate($quotation);
-        $verified = $this->verifiedCents($booking, $quotation);
+        $booking->unsetRelation('payments');
+        $contract = $this->contracts->summarize($booking);
+        $deposit = $this->deposits->forBooking($booking);
+        $verified = $this->sum($booking, fn (Payment $payment) => $payment->countsAsVerified());
+        $pending = $this->sum($booking, fn (Payment $payment) => $this->isOpenClaim($payment));
+        $rejected = $this->sum($booking, fn (Payment $payment) => $payment->status === 'rejected' || $payment->verification_status === 'rejected');
+        $recorded = $this->sum($booking, fn (Payment $payment) => $payment->status === 'paid' && ! $payment->countsAsVerified());
+        $contractCents = $contract['contract_cents'];
+        $outstanding = max(0, $contractCents - $verified);
         $required = $deposit['final_deposit_cents'];
-        $accepted = $deposit['accepted_amount_cents'];
+        $depositOutstanding = min($outstanding, max(0, $required - $verified));
 
         return [
-            'quotation_id' => (int) $quotation->id,
-            'quotation_version' => (int) $quotation->version_number,
-            'accepted_amount_cents' => $accepted,
+            'quotation_id' => null,
+            'quotation_version' => null,
+            'accepted_amount_cents' => $contractCents,
+            'contract_cents' => $contractCents,
             'verified_cents' => $verified,
+            'pending_cents' => $pending,
+            'rejected_cents' => $rejected,
+            'recorded_cents' => $recorded,
             'required_deposit_cents' => $required,
-            'deposit_outstanding_cents' => max(0, $required - $verified),
-            'balance_outstanding_cents' => max(0, $accepted - $verified),
+            'original_deposit_cents' => $deposit['original_deposit_cents'],
+            'additional_deposit_cents' => $deposit['additional_deposit_cents'],
+            'deposit_outstanding_cents' => $depositOutstanding,
+            'balance_outstanding_cents' => $outstanding,
+            'eligible_cents' => max(0, $outstanding - $pending),
             'requirements_met' => $verified >= $required,
-            'paid_in_full' => $verified >= $accepted,
-            'accepted_count' => 1,
+            'paid_in_full' => $contractCents > 0 && $verified >= $contractCents,
+            'accepted_count' => count($contract['accepted_lines']),
         ];
     }
 
     /**
-     * Current customer-accepted quotations. Payment claims still apply to exactly one of these.
+     * Current customer-accepted quotations. Kept so older payment records can still
+     * point at one quotation. New claims are not limited to a single quotation.
      *
      * @return Collection<int, Quotation>
      */
@@ -77,6 +88,7 @@ class PaymentCalculator
             ->where('is_current', true)
             ->where('status', 'approved')
             ->whereNotNull('customer_approved_at')
+            ->whereHas('quotationRequest', fn ($requests) => $requests->where('status', 'open'))
             ->orderBy('id');
 
         if ($lock) {
@@ -92,54 +104,28 @@ class PaymentCalculator
     public function claimRoom(Booking $booking): array
     {
         $summary = $this->summarize($booking);
-        $empty = [
-            'balance_room_cents' => 0,
-            'deposit_room_cents' => 0,
-            'open_claim_cents' => 0,
-        ];
-
-        if ($summary['quotation_id'] === null || $summary['balance_outstanding_cents'] === null) {
-            return $empty;
-        }
-
-        $quotation = Quotation::query()->find($summary['quotation_id']);
-
-        if ($quotation === null) {
-            return $empty;
-        }
-
-        $open = $this->openClaimCents($booking, $quotation);
-        $openDeposit = $this->openClaimCents($booking, $quotation, 'deposit');
-
-        $balanceRoom = max(0, $summary['balance_outstanding_cents'] - $open);
+        $openDeposit = $this->sum(
+            $booking,
+            fn (Payment $payment) => $this->isOpenClaim($payment) && $payment->payment_type === 'deposit',
+        );
 
         return [
-            'balance_room_cents' => $balanceRoom,
-            'deposit_room_cents' => min($balanceRoom, max(0, $summary['deposit_outstanding_cents'] - $openDeposit)),
-            'open_claim_cents' => $open,
+            'balance_room_cents' => $summary['eligible_cents'],
+            'deposit_room_cents' => min($summary['eligible_cents'], max(0, $summary['deposit_outstanding_cents'] - $openDeposit)),
+            'open_claim_cents' => $summary['pending_cents'],
         ];
     }
 
-    public function verifiedCents(Booking $booking, Quotation $quotation): int
+    private function isOpenClaim(Payment $payment): bool
     {
-        return (int) $booking->payments()
-            ->where('quotation_id', $quotation->id)
-            ->where('quotation_version', $quotation->version_number)
-            ->get()
-            ->sum(fn (Payment $payment) => $payment->countsAsVerified()
-                ? Money::toCents((string) $payment->amount)
-                : 0);
+        return in_array($payment->status, ['pending', 'submitted'], true)
+            && ! in_array($payment->verification_status, ['rejected', 'verified'], true);
     }
 
-    private function openClaimCents(Booking $booking, Quotation $quotation, ?string $type = null): int
+    private function sum(Booking $booking, callable $include): int
     {
-        return (int) $booking->payments()
-            ->where('quotation_id', $quotation->id)
-            ->where('quotation_version', $quotation->version_number)
-            ->whereIn('status', ['pending', 'submitted'])
-            ->whereNotIn('verification_status', ['rejected', 'verified'])
-            ->when($type !== null, fn ($query) => $query->where('payment_type', $type))
-            ->get()
-            ->sum(fn (Payment $payment) => Money::toCents((string) $payment->amount));
+        return (int) $booking->payments->sum(function (Payment $payment) use ($include) {
+            return $include($payment) ? Money::toCents((string) $payment->amount) : 0;
+        });
     }
 }

@@ -119,7 +119,7 @@
                     @endif
 
                     @if (! empty($customerCanPayQuotation))
-                        <p class="mt-3"><a href="{{ route('bookings.payments.index', $booking) }}">Submit a payment</a></p>
+                        <p class="mt-3"><a href="{{ route('bookings.payments.index', $booking) }}">Payments</a></p>
                     @endif
 
                     @if (auth()->id() === $booking->customer_id && $booking->status === 'pending' && $booking->payment === null)

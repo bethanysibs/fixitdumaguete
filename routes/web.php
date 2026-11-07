@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Admin\QuotationController as AdminQuotationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -42,6 +43,10 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/bookings/{booking}/quotation/approve', [AdminQuotationController::class, 'confirm'])->name('admin.quotations.confirm');
     Route::post('/admin/bookings/{booking}/quotation/approve', [AdminQuotationController::class, 'approve'])->name('admin.quotations.approve');
     Route::post('/admin/bookings/{booking}/quotation/reject', [AdminQuotationController::class, 'reject'])->name('admin.quotations.reject');
+    Route::get('/admin/payments', [AdminPaymentController::class, 'index'])->name('admin.payments.index');
+    Route::get('/admin/payments/{payment}', [AdminPaymentController::class, 'show'])->name('admin.payments.show');
+    Route::post('/admin/payments/{payment}/verify', [AdminPaymentController::class, 'verify'])->name('admin.payments.verify');
+    Route::post('/admin/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('admin.payments.reject');
     Route::get('/admin/commission', [AdminCommissionController::class, 'index'])->name('admin.commission.index');
     Route::post('/admin/commission', [AdminCommissionController::class, 'store'])->name('admin.commission.store');
     Route::get('/admin/users/{user}/profile', [WorkerProfileEditorController::class, 'create'])->name('admin.workers.create');

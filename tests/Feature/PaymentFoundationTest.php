@@ -277,9 +277,10 @@ class PaymentFoundationTest extends TestCase
 
         $summary = app(PaymentCalculator::class)->summarize($booking->refresh());
         $this->assertSame(5000, $summary['verified_cents']);
-        $this->assertSame(10000, $summary['required_deposit_cents']);
-        $this->assertSame(5000, $summary['deposit_outstanding_cents']);
-        $this->assertSame(15000, $summary['balance_outstanding_cents']);
+        $this->assertSame(105000, $summary['contract_cents']);
+        $this->assertSame(52500, $summary['required_deposit_cents']);
+        $this->assertSame(47500, $summary['deposit_outstanding_cents']);
+        $this->assertSame(100000, $summary['balance_outstanding_cents']);
         $this->assertFalse($summary['requirements_met']);
         $this->assertFalse($summary['paid_in_full']);
         $this->assertSame('pending', $pending->refresh()->status);
@@ -294,17 +295,17 @@ class PaymentFoundationTest extends TestCase
         ])->forceFill(['verification_status' => 'verified'])->save();
 
         $summary = app(PaymentCalculator::class)->summarize($booking->refresh());
-        $this->assertSame(5000, $summary['verified_cents']);
-        $this->assertSame(20000, $summary['accepted_amount_cents']);
+        $this->assertSame(90000, $summary['verified_cents']);
+        $this->assertSame(105000, $summary['accepted_amount_cents']);
 
         $this->mark($this->payment($booking, $quotation, $customer, '50.00', 'balance'), 'verified', 'verified');
         $summary = app(PaymentCalculator::class)->summarize($booking->refresh());
-        $this->assertSame(10000, $summary['verified_cents']);
+        $this->assertSame(95000, $summary['verified_cents']);
         $this->assertSame(0, $summary['deposit_outstanding_cents']);
         $this->assertSame(10000, $summary['balance_outstanding_cents']);
         $this->assertTrue($summary['requirements_met']);
         $this->assertFalse($summary['paid_in_full']);
-        $this->assertSame('100.00', $booking->verifiedPaymentTotal());
+        $this->assertSame('950.00', $booking->verifiedPaymentTotal());
         $this->assertSame('100.00', $booking->outstandingBalance());
         $this->assertSame($financial, $this->financial($booking->refresh()));
         $this->assertSame('200.00', $quotation->refresh()->total_amount);
@@ -380,8 +381,8 @@ class PaymentFoundationTest extends TestCase
         $this->mark($payment, 'verified', 'verified');
         $summary = app(PaymentCalculator::class)->summarize($booking->refresh());
         $this->assertSame(2000, $summary['verified_cents']);
-        $this->assertTrue($summary['requirements_met']);
-        $this->assertSame(18000, $summary['balance_outstanding_cents']);
+        $this->assertFalse($summary['requirements_met']);
+        $this->assertSame(103000, $summary['balance_outstanding_cents']);
         $this->assertSame($financial, $this->financial($booking->refresh()));
 
         $log = PaymentLog::query()->where('payment_id', $payment->id)->where('action', 'recorded')->firstOrFail();
@@ -457,11 +458,11 @@ class PaymentFoundationTest extends TestCase
         ])->assertRedirect();
 
         $summary = app(PaymentCalculator::class)->summarize($booking->refresh());
-        $this->assertSame($revised->id, $summary['quotation_id']);
-        $this->assertSame(2, $summary['quotation_version']);
-        $this->assertSame(8000, $summary['accepted_amount_cents']);
-        $this->assertSame(0, $summary['verified_cents']);
-        $this->assertSame(800, $summary['required_deposit_cents']);
+        $this->assertNull($summary['quotation_id']);
+        $this->assertNull($summary['quotation_version']);
+        $this->assertSame(93000, $summary['accepted_amount_cents']);
+        $this->assertSame(2000, $summary['verified_cents']);
+        $this->assertSame(9300, $summary['required_deposit_cents']);
         $this->assertFalse($summary['requirements_met']);
         $this->assertSame($accepted->id, $payment->refresh()->quotation_id);
         $this->assertSame(1, $payment->quotation_version);

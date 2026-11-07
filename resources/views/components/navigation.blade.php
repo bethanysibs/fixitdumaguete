@@ -38,6 +38,9 @@
                                 <a class="nav-link" href="{{ route('admin.bookings.index') }}">Bookings</a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link" href="{{ route('admin.payments.index') }}">Payments</a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link" href="{{ route('admin.commission.index') }}">Commission</a>
                             </li>
                         @endif

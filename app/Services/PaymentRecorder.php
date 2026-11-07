@@ -153,17 +153,8 @@ class PaymentRecorder
                 ]);
             }
 
-            $accepted = $this->claims->currentAccepted($locked, true);
-
-            if ($accepted->count() !== 1) {
-                throw ValidationException::withMessages([
-                    'quotation' => $accepted->isEmpty()
-                        ? 'Accept the current quotation before submitting a payment.'
-                        : 'A payment claim cannot yet be applied across more than one accepted quotation.',
-                ]);
-            }
-
-            $quotation = $accepted->first();
+            Payment::query()->where('booking_id', $locked->id)->lockForUpdate()->get();
+            $locked->unsetRelation('payments');
 
             if (! in_array($type, ['deposit', 'balance', 'full_payment'], true)) {
                 throw ValidationException::withMessages([
@@ -211,8 +202,6 @@ class PaymentRecorder
 
             $duplicate = Payment::query()
                 ->where('booking_id', $locked->id)
-                ->where('quotation_id', $quotation->id)
-                ->where('quotation_version', $quotation->version_number)
                 ->where('payment_type', $type)
                 ->where('method', $method)
                 ->where('payment_reference', $reference)
@@ -247,7 +236,7 @@ class PaymentRecorder
                 ]);
             }
 
-            if ($type === 'deposit' && $cents > $room['deposit_room_cents']) {
+            if ($type === 'deposit' && ($room['deposit_room_cents'] <= 0 || $cents > $room['deposit_room_cents'])) {
                 throw ValidationException::withMessages([
                     'amount' => 'A deposit cannot be more than the deposit still due.',
                 ]);
@@ -260,8 +249,6 @@ class PaymentRecorder
             }
 
             $snapshot = $this->financial($locked);
-            $total = (string) $quotation->total_amount;
-            $acceptedAt = $quotation->customer_approved_at->toDateTimeString();
             $storedPath = null;
 
             try {
@@ -269,14 +256,14 @@ class PaymentRecorder
                 $payment->forceFill([
                     'booking_id' => $locked->id,
                     'customer_id' => $locked->customer_id,
-                    'quotation_id' => $quotation->id,
-                    'quotation_version' => $quotation->version_number,
+                    'quotation_id' => null,
+                    'quotation_version' => null,
                     'payment_type' => $type,
                     'method' => $method,
                     'status' => 'submitted',
                     'verification_status' => 'pending_review',
                     'amount' => $amount,
-                    'currency' => $quotation->currency ?: 'PHP',
+                    'currency' => 'PHP',
                     'payment_reference' => $reference,
                     'submitted_by' => $actor->id,
                     'submitted_at' => now(),
@@ -289,12 +276,8 @@ class PaymentRecorder
                 $storedPath = $this->proofs->store($payment, $proof, $actor)->file_path;
 
                 $locked->refresh();
-                $quotation->refresh();
 
                 if ($this->financial($locked) !== $snapshot
-                    || (string) $quotation->total_amount !== $total
-                    || $quotation->status !== 'approved'
-                    || $quotation->customer_approved_at?->toDateTimeString() !== $acceptedAt
                     || $payment->status !== 'submitted'
                     || $payment->verification_status !== 'pending_review'
                     || $payment->verified_at !== null
@@ -311,6 +294,91 @@ class PaymentRecorder
 
                 throw $exception;
             }
+        });
+    }
+
+    public function verify(Payment $payment, User $actor): Payment
+    {
+        if (! $actor->isAdmin()) {
+            throw new AuthorizationException('Only an administrator can check a payment.');
+        }
+
+        return DB::transaction(function () use ($payment, $actor) {
+            $locked = Payment::query()->whereKey($payment->id)->lockForUpdate()->first();
+
+            if ($locked === null) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Choose a payment to check.',
+                ]);
+            }
+
+            if ($locked->countsAsVerified() || $locked->verification_status === 'verified') {
+                throw ValidationException::withMessages([
+                    'payment' => 'This payment was already checked.',
+                ]);
+            }
+
+            if ($locked->status !== 'submitted' || $locked->verification_status !== 'pending_review') {
+                throw ValidationException::withMessages([
+                    'payment' => 'Only a receipt waiting for verification can be marked paid.',
+                ]);
+            }
+
+            $locked->forceFill([
+                'status' => 'verified',
+                'verification_status' => 'verified',
+                'verified_by' => $actor->id,
+                'verified_at' => now(),
+            ])->save();
+
+            return $locked->refresh();
+        });
+    }
+
+    public function reject(Payment $payment, User $actor, string $reason): Payment
+    {
+        if (! $actor->isAdmin()) {
+            throw new AuthorizationException('Only an administrator can check a payment.');
+        }
+
+        $reason = trim($reason);
+
+        if (strlen($reason) < 3 || strlen($reason) > 500) {
+            throw ValidationException::withMessages([
+                'rejection_reason' => 'Enter a reason of 3 to 500 characters.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($payment, $actor, $reason) {
+            $locked = Payment::query()->whereKey($payment->id)->lockForUpdate()->first();
+
+            if ($locked === null) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Choose a payment to check.',
+                ]);
+            }
+
+            if ($locked->countsAsVerified() || $locked->verification_status === 'verified') {
+                throw ValidationException::withMessages([
+                    'payment' => 'A paid receipt cannot be rejected here.',
+                ]);
+            }
+
+            if ($locked->status !== 'submitted' || $locked->verification_status !== 'pending_review') {
+                throw ValidationException::withMessages([
+                    'payment' => 'Only a receipt waiting for verification can be rejected.',
+                ]);
+            }
+
+            $locked->forceFill([
+                'status' => 'rejected',
+                'verification_status' => 'rejected',
+                'rejected_by' => $actor->id,
+                'rejected_at' => now(),
+                'rejection_reason' => $reason,
+            ])->save();
+
+            return $locked->refresh();
         });
     }
 

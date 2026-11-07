@@ -1,6 +1,6 @@
 <h2 class="h5 mt-4">Receipts you sent</h2>
 @if ($claims->isEmpty())
-    <p>No payment claim has been submitted for this visit.</p>
+    <p>You have not sent a receipt yet.</p>
 @else
     <div class="table-responsive">
         <table class="table align-middle">
@@ -10,9 +10,8 @@
                     <th scope="col">Amount</th>
                     <th scope="col">Method</th>
                     <th scope="col">Reference</th>
-                    <th scope="col">Submitted</th>
+                    <th scope="col">Sent</th>
                     <th scope="col">Status</th>
-                    <th scope="col">Review</th>
                     <th scope="col">Receipt</th>
                 </tr>
             </thead>
@@ -26,15 +25,6 @@
                         <td>{{ ($claim->submitted_at ?? $claim->created_at)?->timezone(config('app.timezone'))->format('M j, Y g:i A') }}</td>
                         <td>{{ $claim->customerStatusLabel() }}</td>
                         <td>
-                            <span @class([
-                                'badge',
-                                'text-bg-warning' => $claim->verification_status === 'pending_review',
-                                'text-bg-danger' => $claim->verification_status === 'rejected' || $claim->status === 'rejected',
-                                'text-bg-success' => $claim->verification_status === 'verified',
-                                'text-bg-secondary' => ! in_array($claim->verification_status, ['pending_review', 'rejected', 'verified'], true) && $claim->status !== 'rejected',
-                            ])>{{ $claim->customerVerificationLabel() }}</span>
-                        </td>
-                        <td>
                             @foreach ($claim->proofs as $proof)
                                 <a href="{{ route('bookings.payments.proof', [$booking, $claim, $proof]) }}">Download receipt</a>
                             @endforeach
@@ -42,14 +32,12 @@
                     </tr>
                     @if ($claim->rejection_reason)
                         <tr>
-                            <td colspan="8">
-                                <strong>Rejection reason:</strong> {{ $claim->rejection_reason }}
-                            </td>
+                            <td colspan="7">This receipt was not accepted: {{ $claim->rejection_reason }} You can send another receipt.</td>
                         </tr>
                     @endif
                     @if ($claim->notes)
                         <tr>
-                            <td colspan="8">Note: {{ $claim->notes }}</td>
+                            <td colspan="7">Note: {{ $claim->notes }}</td>
                         </tr>
                     @endif
                 @endforeach
