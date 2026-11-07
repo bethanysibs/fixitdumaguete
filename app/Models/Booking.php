@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\PaymentCalculator;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -58,6 +59,23 @@ class Booking extends Model
     public function payment(): HasOne
     {
         return $this->hasOne(Payment::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class)->orderBy('id');
+    }
+
+    public function verifiedPaymentTotal(): string
+    {
+        return Money::fromCents(app(PaymentCalculator::class)->summarize($this)['verified_cents']);
+    }
+
+    public function outstandingBalance(): ?string
+    {
+        $cents = app(PaymentCalculator::class)->summarize($this)['balance_outstanding_cents'];
+
+        return $cents === null ? null : Money::fromCents($cents);
     }
 
     public function commissionSetting(): BelongsTo

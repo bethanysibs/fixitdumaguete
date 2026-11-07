@@ -66,8 +66,8 @@ class CommissionCalculator
             ->where('customer_id', $customerId)
             ->where('worker_profile_id', $workerProfileId)
             ->where('status', 'completed')
-            ->whereHas('payment', fn ($query) => $query->where('status', 'paid'))
-            ->whereDoesntHave('payment', fn ($query) => $query->where('status', 'refunded'))
+            ->whereHas('payment', fn ($query) => $query->where('method', 'platform')->where('status', 'paid'))
+            ->whereDoesntHave('payment', fn ($query) => $query->where('method', 'platform')->where('status', 'refunded'))
             ->exists();
     }
 

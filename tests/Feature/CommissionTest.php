@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Models\WorkerProfile;
 use App\Services\CommissionCalculator;
 use Database\Seeders\DemoMarketplaceSeeder;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -267,7 +266,7 @@ class CommissionTest extends TestCase
         $this->assertSame('765.00', $booking->worker_amount);
     }
 
-    public function test_a_refunded_payment_does_not_qualify_and_a_second_payment_is_rejected(): void
+    public function test_a_refunded_platform_payment_does_not_qualify_as_a_repeat(): void
     {
         $customer = User::query()->where('email', 'customer@fixitdumaguete.test')->firstOrFail();
         $worker = WorkerProfile::query()->where('slug', 'andres-villanueva')->firstOrFail();
@@ -285,20 +284,6 @@ class CommissionTest extends TestCase
         ]);
 
         $this->assertTrue($calculator->hasCompletedPaidBooking($customer->id, $worker->id));
-
-        try {
-            Payment::query()->create([
-                'booking_id' => $booking->id,
-                'customer_id' => $customer->id,
-                'amount' => $booking->price_amount,
-                'status' => 'refunded',
-                'method' => 'platform',
-                'paid_at' => now(),
-            ]);
-            $this->fail('A booking stored a second payment.');
-        } catch (QueryException) {
-            $this->assertSame(1, Payment::query()->where('booking_id', $booking->id)->count());
-        }
 
         $payment->update(['status' => 'refunded']);
 
