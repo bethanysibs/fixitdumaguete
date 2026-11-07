@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ContractAmountCalculator;
 use App\Services\PaymentCalculator;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -90,12 +91,50 @@ class Booking extends Model
 
     public function quotations(): HasMany
     {
-        return $this->hasMany(Quotation::class)->orderBy('version_number');
+        return $this->hasMany(Quotation::class)->orderBy('quotation_request_id')->orderBy('version_number');
+    }
+
+    public function quotationRequests(): HasMany
+    {
+        return $this->hasMany(QuotationRequest::class)->orderBy('request_number');
     }
 
     public function currentQuotation(): HasOne
     {
         return $this->hasOne(Quotation::class)->where('is_current', true);
+    }
+
+    public function currentQuotations(): HasMany
+    {
+        return $this->hasMany(Quotation::class)->where('is_current', true);
+    }
+
+    /**
+     * @param  callable(Quotation): bool  $matches
+     */
+    public function currentQuotationFor(?int $requestId, callable $matches): ?Quotation
+    {
+        $quotations = $this->quotations()->where('is_current', true)->get();
+
+        if ($requestId !== null) {
+            $quotation = $quotations->first(
+                fn (Quotation $quotation) => (int) $quotation->quotation_request_id === $requestId,
+            );
+
+            return $quotation !== null && $matches($quotation) ? $quotation : null;
+        }
+
+        $matched = $quotations->filter($matches)->values();
+
+        return $matched->count() === 1 ? $matched->first() : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function contractSummary(): array
+    {
+        return app(ContractAmountCalculator::class)->summarize($this);
     }
 
     public function statusLabel(): string

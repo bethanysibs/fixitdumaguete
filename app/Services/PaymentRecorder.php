@@ -153,17 +153,17 @@ class PaymentRecorder
                 ]);
             }
 
-            $quotation = Quotation::query()
-                ->where('booking_id', $locked->id)
-                ->where('is_current', true)
-                ->lockForUpdate()
-                ->first();
+            $accepted = $this->claims->currentAccepted($locked, true);
 
-            if ($quotation === null || $quotation->status !== 'approved' || $quotation->customer_approved_at === null) {
+            if ($accepted->count() !== 1) {
                 throw ValidationException::withMessages([
-                    'quotation' => 'Accept the current quotation before submitting a payment.',
+                    'quotation' => $accepted->isEmpty()
+                        ? 'Accept the current quotation before submitting a payment.'
+                        : 'A payment claim cannot yet be applied across more than one accepted quotation.',
                 ]);
             }
+
+            $quotation = $accepted->first();
 
             if (! in_array($type, ['deposit', 'balance', 'full_payment'], true)) {
                 throw ValidationException::withMessages([

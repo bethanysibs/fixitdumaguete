@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Booking;
 use App\Models\Quotation;
+use App\Models\QuotationRequest;
 use App\Models\User;
 use App\Models\WorkerProfile;
 use Database\Seeders\DemoMarketplaceSeeder;
@@ -142,7 +143,14 @@ class WorkerQuotationTest extends TestCase
             ->post(route('jobs.quotation.store', $booking), $this->payload([
                 $this->item('labor', 'Another version', '1', 'hour', '1.00'),
             ]))
-            ->assertForbidden();
+            ->assertRedirect();
+
+        $extra = Quotation::query()->where('booking_id', $booking->id)->whereKeyNot($submitted->id)->firstOrFail();
+        $this->assertNotSame($submitted->quotation_request_id, $extra->quotation_request_id);
+        $this->assertSame('draft', $extra->status);
+        $extraRequestId = $extra->quotation_request_id;
+        $extra->delete();
+        QuotationRequest::query()->whereKey($extraRequestId)->delete();
 
         $submitted->refresh();
         $this->assertSame('submitted', $submitted->status);

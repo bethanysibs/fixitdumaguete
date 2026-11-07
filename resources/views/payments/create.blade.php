@@ -31,7 +31,7 @@
                                         <option value="{{ $type['value'] }}" @selected(old('payment_type') === $type['value'])>{{ $type['label'] }}</option>
                                     @endforeach
                                 </select>
-                                <div class="form-text">A deposit can be up to {{ $depositRoom }}. A balance can be up to {{ $balanceRoom }}. A full payment must be {{ $balanceRoom }}.</div>
+                                <div class="form-text">Enter the amount you sent, up to {{ $balanceRoom }}.@if (! empty($depositDue)) Include {{ $depositDue }} with the first receipt.@endif</div>
                                 @error('payment_type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
 

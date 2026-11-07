@@ -31,13 +31,18 @@ class Quotation extends Model
     protected static function booted(): void
     {
         static::saving(function (Quotation $quotation): void {
-            $quotation->current_booking_id = $quotation->is_current ? $quotation->booking_id : null;
+            $quotation->current_request_id = $quotation->is_current ? $quotation->quotation_request_id : null;
         });
     }
 
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function quotationRequest(): BelongsTo
+    {
+        return $this->belongsTo(QuotationRequest::class);
     }
 
     public function items(): HasMany

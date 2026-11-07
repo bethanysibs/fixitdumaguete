@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Booking;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
+use App\Models\QuotationRequest;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,26 +17,26 @@ class QuotationVersioner
     /**
      * @param  list<array<string, mixed>>  $items
      */
-    public function append(Booking $booking, array $items, ?int $createdBy = null, ?string $notes = null): Quotation
+    public function append(Booking $booking, array $items, ?int $createdBy = null, ?string $notes = null, ?string $title = null, ?string $description = null): Quotation
     {
         $calculated = $this->calculator->calculate($items);
         $notes = $this->notes($notes);
+        $description = $this->boundedText($description, 'description');
 
-        return DB::transaction(function () use ($booking, $calculated, $createdBy, $notes) {
+        return DB::transaction(function () use ($booking, $calculated, $createdBy, $notes, $title, $description) {
             $this->lockBooking($booking->id);
 
-            $version = $this->nextVersion($booking->id);
+            $number = (int) QuotationRequest::query()->where('booking_id', $booking->id)->max('request_number') + 1;
+            $request = new QuotationRequest;
+            $request->booking_id = $booking->id;
+            $request->request_number = $number;
+            $request->title = $this->requestTitle($title, $number);
+            $request->description = $description;
+            $request->status = 'open';
+            $request->created_by = $createdBy;
+            $request->save();
 
-            Quotation::query()
-                ->where('booking_id', $booking->id)
-                ->where('is_current', true)
-                ->update([
-                    'status' => 'superseded',
-                    'is_current' => false,
-                    'current_booking_id' => null,
-                ]);
-
-            return $this->persist($booking->id, $version, $calculated, $createdBy, $notes);
+            return $this->persist($booking->id, $request->id, 1, $calculated, $createdBy, $notes);
         });
     }
 
@@ -106,14 +107,12 @@ class QuotationVersioner
             $this->ensureRevisable($quotation);
             $this->ensureBookingCanBeReviewed($quotation->booking_id);
 
-            Quotation::query()->whereKey($quotation->id)->update([
-                'is_current' => false,
-                'current_booking_id' => null,
-            ]);
+            $this->clearCurrent($quotation);
 
             return $this->persist(
                 $quotation->booking_id,
-                $this->nextVersion($quotation->booking_id),
+                (int) $quotation->quotation_request_id,
+                $this->nextVersion((int) $quotation->quotation_request_id),
                 $calculated,
                 $createdBy,
                 $notes,
@@ -167,14 +166,12 @@ class QuotationVersioner
             $this->ensureAdjustable($quotation);
             $this->ensureBookingCanBeReviewed($quotation->booking_id);
 
-            Quotation::query()->whereKey($quotation->id)->update([
-                'is_current' => false,
-                'current_booking_id' => null,
-            ]);
+            $this->clearCurrent($quotation);
 
             return $this->persist(
                 $quotation->booking_id,
-                $this->nextVersion($quotation->booking_id),
+                (int) $quotation->quotation_request_id,
+                $this->nextVersion((int) $quotation->quotation_request_id),
                 $calculated,
                 $adminId,
                 $notes,
@@ -367,9 +364,35 @@ class QuotationVersioner
         Booking::query()->whereKey($bookingId)->lockForUpdate()->firstOrFail();
     }
 
-    private function nextVersion(int $bookingId): int
+    private function clearCurrent(Quotation $quotation): void
     {
-        return (int) Quotation::query()->where('booking_id', $bookingId)->max('version_number') + 1;
+        Quotation::query()->whereKey($quotation->id)->update([
+            'is_current' => false,
+            'current_booking_id' => null,
+            'current_request_id' => null,
+        ]);
+    }
+
+    private function nextVersion(int $requestId): int
+    {
+        return (int) Quotation::query()->where('quotation_request_id', $requestId)->max('version_number') + 1;
+    }
+
+    private function requestTitle(?string $title, int $number): string
+    {
+        $title = trim((string) $title);
+
+        if ($title === '') {
+            return 'Additional quotation '.$number;
+        }
+
+        if (mb_strlen($title) > 120) {
+            throw ValidationException::withMessages([
+                'title' => 'Enter a title of 120 characters or fewer.',
+            ]);
+        }
+
+        return $title;
     }
 
     /**
@@ -377,6 +400,7 @@ class QuotationVersioner
      */
     private function persist(
         int $bookingId,
+        int $requestId,
         int $version,
         array $calculated,
         ?int $createdBy,
@@ -388,6 +412,7 @@ class QuotationVersioner
     ): Quotation {
         $quotation = new Quotation;
         $quotation->booking_id = $bookingId;
+        $quotation->quotation_request_id = $requestId;
         $quotation->source_quotation_id = $sourceQuotationId;
         $quotation->version_number = $version;
         $quotation->status = $status;

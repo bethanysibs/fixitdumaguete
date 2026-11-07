@@ -130,10 +130,11 @@ class QuotationTest extends TestCase
 
         $first->refresh();
         $this->assertSame(1, $first->version_number);
-        $this->assertSame(2, $second->version_number);
+        $this->assertSame(1, $second->version_number);
         $this->assertSame(1, $otherVersion->version_number);
-        $this->assertSame('superseded', $first->status);
-        $this->assertFalse($first->is_current);
+        $this->assertNotSame($first->quotation_request_id, $second->quotation_request_id);
+        $this->assertSame('draft', $first->status);
+        $this->assertTrue($first->is_current);
         $this->assertSame('draft', $second->status);
         $this->assertTrue($second->is_current);
         $this->assertNotSame('approved', $second->status);
@@ -141,10 +142,24 @@ class QuotationTest extends TestCase
         $this->assertSame('200.00', $first->items()->first()->line_total);
         $this->assertSame('Replace the kitchen trap', $first->items()->first()->description);
         $this->assertSame('50.00', $second->total_amount);
-        $this->assertSame(1, Quotation::query()->where('booking_id', $booking->id)->where('is_current', true)->count());
+        $this->assertSame(2, Quotation::query()->where('booking_id', $booking->id)->where('is_current', true)->count());
+
+        $versioner->submit($first);
+        $revision = $versioner->startRevision($first->fresh());
+        $first->refresh();
+        $second->refresh();
+        $this->assertSame('submitted', $first->status);
+        $this->assertFalse($first->is_current);
+        $this->assertSame('200.00', $first->total_amount);
+        $this->assertSame(2, $revision->version_number);
+        $this->assertSame($first->quotation_request_id, $revision->quotation_request_id);
+        $this->assertTrue($revision->is_current);
+        $this->assertTrue($second->is_current);
+        $this->assertSame(1, $second->version_number);
 
         $duplicate = new Quotation;
         $duplicate->booking_id = $booking->id;
+        $duplicate->quotation_request_id = $first->quotation_request_id;
         $duplicate->version_number = 1;
         $duplicate->status = 'draft';
         $duplicate->currency = 'PHP';
@@ -154,13 +169,14 @@ class QuotationTest extends TestCase
 
         try {
             $duplicate->save();
-            $this->fail('A booking stored two quotations with version 1.');
+            $this->fail('A quotation request stored two quotations with version 1.');
         } catch (QueryException) {
-            $this->assertSame(2, Quotation::query()->where('booking_id', $booking->id)->count());
+            $this->assertSame(1, Quotation::query()->where('quotation_request_id', $first->quotation_request_id)->where('version_number', 1)->count());
         }
 
         $secondCurrent = new Quotation;
         $secondCurrent->booking_id = $booking->id;
+        $secondCurrent->quotation_request_id = $revision->quotation_request_id;
         $secondCurrent->version_number = 3;
         $secondCurrent->status = 'draft';
         $secondCurrent->currency = 'PHP';
@@ -170,9 +186,9 @@ class QuotationTest extends TestCase
 
         try {
             $secondCurrent->save();
-            $this->fail('A booking stored two current quotations.');
+            $this->fail('A quotation request stored two current quotations.');
         } catch (QueryException) {
-            $this->assertSame(1, Quotation::query()->where('booking_id', $booking->id)->where('is_current', true)->count());
+            $this->assertSame(1, Quotation::query()->where('quotation_request_id', $revision->quotation_request_id)->where('is_current', true)->count());
         }
     }
 

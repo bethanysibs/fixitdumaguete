@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\Quotation;
+use App\Services\ContractAmountCalculator;
 use App\Services\QuotationVersioner;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,10 @@ use Illuminate\View\View;
 
 class CustomerQuotationController extends Controller
 {
-    public function __construct(private QuotationVersioner $versions) {}
+    public function __construct(
+        private QuotationVersioner $versions,
+        private ContractAmountCalculator $contracts,
+    ) {}
 
     public function show(Request $request, Booking $booking): View
     {
@@ -21,18 +25,19 @@ class CustomerQuotationController extends Controller
         $booking->load([
             'service.category',
             'workerProfile.user',
-            'quotations.items',
+            'quotationRequests.quotations.items',
         ]);
 
         return view('quotations.customer', [
             'booking' => $booking,
+            'contract' => $this->contracts->summarize($booking),
         ]);
     }
 
     public function confirm(Request $request, Booking $booking): View
     {
         $this->ensureOwner($request, $booking);
-        $quotation = $this->decidable($booking);
+        $quotation = $this->decidable($request, $booking);
         $quotation->load('items');
 
         return view('quotations.customer-confirm', [
@@ -44,7 +49,7 @@ class CustomerQuotationController extends Controller
     public function accept(Request $request, Booking $booking): RedirectResponse
     {
         $this->ensureOwner($request, $booking);
-        $quotation = $this->decidable($booking);
+        $quotation = $this->decidable($request, $booking);
         $data = $request->validate([
             'version_number' => ['required', 'integer'],
         ]);
@@ -63,7 +68,7 @@ class CustomerQuotationController extends Controller
     public function reject(Request $request, Booking $booking): RedirectResponse
     {
         $this->ensureOwner($request, $booking);
-        $quotation = $this->decidable($booking);
+        $quotation = $this->decidable($request, $booking);
 
         $data = $request->validate([
             'version_number' => ['required', 'integer'],
@@ -87,20 +92,38 @@ class CustomerQuotationController extends Controller
         abort_unless($request->user()?->id === $booking->customer_id, 403);
     }
 
-    private function decidable(Booking $booking): Quotation
+    private function decidable(Request $request, Booking $booking): Quotation
     {
         abort_unless($booking->allowsNewQuotation(), 403);
 
-        $quotation = $booking->currentQuotation()->first();
+        $quotation = $booking->currentQuotationFor($this->requestId($request), function (Quotation $quotation) {
+            return $quotation->is_current
+                && $quotation->status === 'admin_approved'
+                && $quotation->admin_approved_at !== null
+                && $quotation->customer_approved_at === null
+                && $quotation->customer_rejected_at === null;
+        });
 
-        abort_unless($quotation !== null
-            && $quotation->is_current
-            && $quotation->status === 'admin_approved'
-            && $quotation->admin_approved_at !== null
-            && $quotation->customer_approved_at === null
-            && $quotation->customer_rejected_at === null, 403);
+        abort_unless($quotation !== null, 403);
 
         return $quotation;
+    }
+
+    private function requestId(Request $request): ?int
+    {
+        $value = $request->input('quotation_request_id');
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_numeric($value) || (string) (int) $value !== (string) $value) {
+            throw ValidationException::withMessages([
+                'quotation_request_id' => 'Choose the additional quotation to review.',
+            ]);
+        }
+
+        return (int) $value;
     }
 
     private function versionNumber(Request $request, Quotation $quotation, ?int $version = null): int

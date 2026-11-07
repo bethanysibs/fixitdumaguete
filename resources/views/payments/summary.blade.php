@@ -1,54 +1,49 @@
 @php
-    $rule = match ($depositRule) {
-        'percentage' => 'Percentage of the accepted quotation',
-        'fixed' => 'Fixed amount',
-        'disabled' => 'Deposit requirement turned off',
-        'unconfigured' => 'No deposit requirement saved',
-        default => null,
-    };
+    $extras = $contract['accepted_lines'];
 @endphp
 
 <div class="payment-panel">
-    <h2 class="h5">Payment summary</h2>
-    @if ($quotation === null)
-        <p class="mb-0">Accept the current quotation before sending a payment. A claim cannot use an older version.</p>
-    @else
-        <dl class="account-details mb-0">
+    <h2 class="h5">What you pay</h2>
+    <dl class="account-details mb-0">
+        <div>
+            <dt>Booked service</dt>
+            <dd>{{ \App\Support\Money::format($contract['original_rate']) }}</dd>
+        </div>
+        @foreach ($extras as $extra)
             <div>
-                <dt>Accepted quotation</dt>
-                <dd>Version {{ $quotation->version_number }}</dd>
+                <dt>{{ count($extras) > 1 ? 'Extra work '.$extra['request_number'] : 'Extra work' }}</dt>
+                <dd>
+                    @if (! preg_match('/^Additional quotation \d+$/', $extra['title']))
+                        {{ $extra['title'] }} ·
+                    @endif
+                    {{ \App\Support\Money::format($extra['amount']) }}
+                </dd>
             </div>
+        @endforeach
+        <div>
+            <dt>Total</dt>
+            <dd class="fw-semibold">{{ \App\Support\Money::format($contract['contract_amount']) }}</dd>
+        </div>
+        <div>
+            <dt>Paid</dt>
+            <dd>{{ \App\Support\Money::format($contract['verified_payments']) }}</dd>
+        </div>
+        @if ($contract['waiting_cents'] > 0)
             <div>
-                <dt>Quotation total</dt>
-                <dd>{{ $acceptedTotal }}</dd>
+                <dt>Receipt waiting to be checked</dt>
+                <dd>{{ \App\Support\Money::format($contract['waiting_review']) }}</dd>
             </div>
-            @if ($rule)
-                <div>
-                    <dt>Deposit rule</dt>
-                    <dd>{{ $rule }}</dd>
-                </div>
-            @endif
+        @endif
+        <div>
+            <dt>Still to pay</dt>
+            <dd class="fw-semibold">{{ \App\Support\Money::format($contract['remaining_payable']) }}</dd>
+        </div>
+        @if (! empty($depositDue))
             <div>
-                <dt>Required deposit</dt>
-                <dd>{{ $requiredDeposit }}</dd>
+                <dt>Send with the first receipt</dt>
+                <dd>{{ $depositDue }}</dd>
             </div>
-            <div>
-                <dt>Verified payments</dt>
-                <dd>{{ $verifiedPayments }}</dd>
-            </div>
-            <div>
-                <dt>Waiting for review</dt>
-                <dd>{{ $openClaims }}</dd>
-            </div>
-            <div>
-                <dt>Deposit still due</dt>
-                <dd>{{ $depositOutstanding }}</dd>
-            </div>
-            <div>
-                <dt>Remaining balance</dt>
-                <dd>{{ $balanceOutstanding }}</dd>
-            </div>
-        </dl>
-        <p class="form-text mt-3 mb-0">A submitted receipt is a claim for review. It does not confirm the payment or change the booked price.</p>
-    @endif
+        @endif
+    </dl>
+    <p class="form-text mt-3 mb-0">A receipt is checked before it counts as paid.</p>
 </div>

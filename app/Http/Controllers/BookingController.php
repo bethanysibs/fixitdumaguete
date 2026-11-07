@@ -7,6 +7,7 @@ use App\Models\BookingPhoto;
 use App\Models\Payment;
 use App\Models\WorkerProfile;
 use App\Services\CommissionCalculator;
+use App\Services\ContractAmountCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -134,25 +135,23 @@ class BookingController extends Controller
         abort_unless($booking->visibleTo($request->user()), 403);
 
         $booking->load(['customer', 'workerProfile.user', 'service.category', 'location', 'payment', 'photos']);
-
-        if ($request->user()->isAdmin() || $request->user()->id === $booking->workerProfile?->user_id) {
-            $booking->load([
-                'quotations.items',
-                'quotations.creator',
-                'quotations.sourceQuotation',
-                'quotations.approver',
-                'quotations.rejector',
-                'quotations.customerAccepter',
-                'quotations.customerRejector',
-            ]);
-        }
+        $booking->load([
+            'quotationRequests.quotations.items',
+            'quotationRequests.quotations.creator',
+            'quotationRequests.quotations.sourceQuotation',
+            'quotationRequests.quotations.approver',
+            'quotationRequests.quotations.rejector',
+            'quotationRequests.quotations.customerAccepter',
+            'quotationRequests.quotations.customerRejector',
+        ]);
 
         return view('bookings.show', [
             'booking' => $booking,
+            'contract' => app(ContractAmountCalculator::class)->summarize($booking),
             'customerCanReviewQuotation' => $request->user()->id === $booking->customer_id
                 && $booking->quotations()->whereIn('status', ['admin_approved', 'approved', 'customer_rejected'])->exists(),
             'customerCanPayQuotation' => $request->user()->id === $booking->customer_id
-                && $booking->currentQuotation()->where('status', 'approved')->whereNotNull('customer_approved_at')->exists(),
+                && $booking->currentQuotations()->where('status', 'approved')->whereNotNull('customer_approved_at')->exists(),
         ]);
     }
 

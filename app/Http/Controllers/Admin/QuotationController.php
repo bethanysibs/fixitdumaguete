@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Quotation;
+use App\Services\ContractAmountCalculator;
 use App\Services\QuotationVersioner;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,21 +14,27 @@ use Illuminate\View\View;
 
 class QuotationController extends Controller
 {
-    public function __construct(private QuotationVersioner $versions) {}
+    public function __construct(
+        private QuotationVersioner $versions,
+        private ContractAmountCalculator $contracts,
+    ) {}
 
     public function show(Request $request, Booking $booking): View
     {
         $this->ensureAdmin($request);
 
+        $booking = $this->booking($booking);
+
         return view('admin.quotations.show', [
-            'booking' => $this->booking($booking),
+            'booking' => $booking,
+            'contract' => $this->contracts->summarize($booking),
         ]);
     }
 
     public function update(Request $request, Booking $booking): RedirectResponse
     {
         $this->ensureAdmin($request);
-        $quotation = $this->adjustableQuotation($booking);
+        $quotation = $this->adjustableQuotation($request, $booking);
         $items = $this->items($request);
         $notes = $this->notes($request);
         $adminNotes = $this->adminNotes($request);
@@ -54,7 +61,7 @@ class QuotationController extends Controller
     public function confirm(Request $request, Booking $booking): View
     {
         $this->ensureAdmin($request);
-        $quotation = $this->submittedQuotation($booking);
+        $quotation = $this->submittedQuotation($request, $booking);
         $quotation->load(['items', 'creator', 'sourceQuotation']);
 
         return view('admin.quotations.confirm', [
@@ -67,7 +74,7 @@ class QuotationController extends Controller
     {
         $this->ensureAdmin($request);
 
-        $this->versions->approve($this->submittedQuotation($booking), $request->user()->id);
+        $this->versions->approve($this->submittedQuotation($request, $booking), $request->user()->id);
 
         return redirect()
             ->route('admin.quotations.show', $booking)
@@ -77,7 +84,7 @@ class QuotationController extends Controller
     public function reject(Request $request, Booking $booking): RedirectResponse
     {
         $this->ensureAdmin($request);
-        $quotation = $this->submittedQuotation($booking);
+        $quotation = $this->submittedQuotation($request, $booking);
 
         $data = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:2000'],
@@ -108,32 +115,57 @@ class QuotationController extends Controller
             'workerProfile.user',
             'service.category',
             'location',
-            'quotations.items',
-            'quotations.creator',
-            'quotations.sourceQuotation',
-            'quotations.approver',
-            'quotations.rejector',
+            'quotationRequests.quotations.items',
+            'quotationRequests.quotations.creator',
+            'quotationRequests.quotations.sourceQuotation',
+            'quotationRequests.quotations.approver',
+            'quotationRequests.quotations.rejector',
+            'quotationRequests.quotations.customerAccepter',
+            'quotationRequests.quotations.customerRejector',
         ]);
     }
 
-    private function submittedQuotation(Booking $booking): Quotation
+    private function submittedQuotation(Request $request, Booking $booking): Quotation
     {
         abort_unless($booking->allowsNewQuotation(), 403);
 
-        $quotation = $booking->currentQuotation()->first();
-        abort_unless($quotation !== null && $quotation->status === 'submitted', 403);
+        $quotation = $booking->currentQuotationFor(
+            $this->requestId($request),
+            fn (Quotation $quotation) => $quotation->status === 'submitted',
+        );
+        abort_unless($quotation !== null, 403);
 
         return $quotation;
     }
 
-    private function adjustableQuotation(Booking $booking): Quotation
+    private function adjustableQuotation(Request $request, Booking $booking): Quotation
     {
         abort_unless($booking->allowsNewQuotation(), 403);
 
-        $quotation = $booking->currentQuotation()->with('items')->first();
-        abort_unless($quotation !== null && in_array($quotation->status, ['submitted', 'admin_approved', 'approved'], true), 403);
+        $quotation = $booking->currentQuotationFor(
+            $this->requestId($request),
+            fn (Quotation $quotation) => in_array($quotation->status, ['submitted', 'admin_approved', 'approved'], true),
+        );
+        abort_unless($quotation !== null, 403);
 
-        return $quotation;
+        return $quotation->load('items');
+    }
+
+    private function requestId(Request $request): ?int
+    {
+        $value = $request->input('quotation_request_id');
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_numeric($value) || (string) (int) $value !== (string) $value) {
+            throw ValidationException::withMessages([
+                'quotation_request_id' => 'Choose the additional quotation to review.',
+            ]);
+        }
+
+        return (int) $value;
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\PaymentProof;
 use App\Models\Quotation;
+use App\Services\ContractAmountCalculator;
 use App\Services\DepositCalculator;
 use App\Services\PaymentCalculator;
 use App\Services\PaymentInstructionCatalog;
@@ -25,6 +26,7 @@ class CustomerPaymentController extends Controller
         private DepositCalculator $deposits,
         private PaymentInstructionCatalog $instructions,
         private PaymentRecorder $recorder,
+        private ContractAmountCalculator $contracts,
     ) {}
 
     public function index(Request $request, Booking $booking): View
@@ -118,6 +120,8 @@ class CustomerPaymentController extends Controller
 
         return [
             'booking' => $booking,
+            'contract' => $this->contracts->summarize($booking),
+            'acceptedCount' => $summary['accepted_count'],
             'quotation' => $quotation,
             'deposit' => $deposit,
             'claims' => $booking->payments()->whereNotNull('quotation_id')->with('proofs')->latest('id')->get(),
@@ -134,6 +138,7 @@ class CustomerPaymentController extends Controller
             'openClaims' => $this->money($room['open_claim_cents']),
             'finalDeposit' => $deposit !== null ? $this->money($deposit['final_deposit_cents']) : null,
             'depositRule' => $deposit['requirement'] ?? null,
+            'depositDue' => $summary['deposit_outstanding_cents'] > 0 ? $this->money($summary['deposit_outstanding_cents']) : null,
         ];
     }
 

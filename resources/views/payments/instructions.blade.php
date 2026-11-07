@@ -4,7 +4,7 @@
         <div @class(['mt-3' => ! $loop->first])>
             <h3 class="h6 mb-2">{{ $instruction['label'] }}</h3>
             @if ($instruction['is_placeholder'] || ($instruction['account_name'] === null && $instruction['account_number'] === null))
-                <p class="mb-2">Account details have not been added yet.</p>
+                <p class="mb-0">Account details have not been added yet.</p>
             @else
                 <dl class="account-details">
                     @if ($instruction['account_name'])
@@ -26,8 +26,8 @@
                         </div>
                     @endif
                 </dl>
+                <p class="mb-2">{{ $instruction['instructions'] }}</p>
             @endif
-            <p class="mb-2">{{ $instruction['instructions'] }}</p>
             @if ($instruction['has_qr'])
                 <p class="form-text">A QR image is kept in private storage and is not published on a public link.</p>
             @endif

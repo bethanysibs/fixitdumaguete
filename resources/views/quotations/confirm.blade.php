@@ -13,6 +13,7 @@
 
             <form class="mt-4" method="POST" action="{{ route('jobs.quotation.submit', $booking) }}">
                 @csrf
+                <input type="hidden" name="quotation_request_id" value="{{ $quotation->quotation_request_id }}">
                 <x-button type="submit">Submit for admin review</x-button>
             </form>
             <p class="mt-3"><a href="{{ route('bookings.show', $booking) }}">Return to the visit</a></p>

@@ -45,9 +45,10 @@ class CustomerPaymentTest extends TestCase
         $this->actingAs($customer)
             ->get(route('bookings.payments.index', $booking))
             ->assertOk()
-            ->assertSee('Version 1')
+            ->assertSee('Extra work')
             ->assertSee('₱200.00')
             ->assertSee('₱20.00')
+            ->assertSee('Still to pay')
             ->assertSee('Account details have not been added yet.')
             ->assertSee('Submit a payment claim')
             ->assertDontSee('Payment recorded.');

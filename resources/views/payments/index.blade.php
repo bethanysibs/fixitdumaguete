@@ -21,8 +21,6 @@
                     @include('payments.history')
                     @if ($canSubmit)
                         <p class="mt-3"><a href="{{ route('bookings.payments.create', $booking) }}">Submit a payment claim</a></p>
-                    @elseif ($quotation && $booking->allowsNewQuotation())
-                        <p class="mt-3">A new claim can be submitted when there is still an unpaid balance and a payment method is available.</p>
                     @endif
                 </div>
                 <div class="col-lg-5">

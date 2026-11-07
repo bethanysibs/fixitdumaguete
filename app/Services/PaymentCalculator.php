@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\Quotation;
 use App\Support\Money;
+use Illuminate\Support\Collection;
 
 class PaymentCalculator
 {
@@ -21,14 +22,16 @@ class PaymentCalculator
      *     deposit_outstanding_cents: int,
      *     balance_outstanding_cents: int|null,
      *     requirements_met: bool,
-     *     paid_in_full: bool
+     *     paid_in_full: bool,
+     *     accepted_count: int
      * }
      */
     public function summarize(Booking $booking): array
     {
-        $quotation = $booking->currentQuotation()->first();
+        $accepted = $this->currentAccepted($booking);
+        $quotation = $accepted->count() === 1 ? $accepted->first() : null;
 
-        if ($quotation === null || $quotation->status !== 'approved' || $quotation->customer_approved_at === null) {
+        if ($quotation === null) {
             return [
                 'quotation_id' => null,
                 'quotation_version' => null,
@@ -39,6 +42,7 @@ class PaymentCalculator
                 'balance_outstanding_cents' => null,
                 'requirements_met' => false,
                 'paid_in_full' => false,
+                'accepted_count' => $accepted->count(),
             ];
         }
 
@@ -57,7 +61,29 @@ class PaymentCalculator
             'balance_outstanding_cents' => max(0, $accepted - $verified),
             'requirements_met' => $verified >= $required,
             'paid_in_full' => $verified >= $accepted,
+            'accepted_count' => 1,
         ];
+    }
+
+    /**
+     * Current customer-accepted quotations. Payment claims still apply to exactly one of these.
+     *
+     * @return Collection<int, Quotation>
+     */
+    public function currentAccepted(Booking $booking, bool $lock = false): Collection
+    {
+        $query = Quotation::query()
+            ->where('booking_id', $booking->id)
+            ->where('is_current', true)
+            ->where('status', 'approved')
+            ->whereNotNull('customer_approved_at')
+            ->orderBy('id');
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->get();
     }
 
     /**

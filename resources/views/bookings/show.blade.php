@@ -82,6 +82,8 @@
                         </div>
                     </dl>
 
+                    @include('quotations.contract-summary', ['audience' => auth()->user()->isAdmin() ? 'admin' : (auth()->id() === $booking->workerProfile->user_id ? 'worker' : 'customer')])
+
                     @if (auth()->user()->isAdmin())
                         <h2 class="h5 mt-4">Quotation</h2>
                         @if ($booking->quotations->isNotEmpty())

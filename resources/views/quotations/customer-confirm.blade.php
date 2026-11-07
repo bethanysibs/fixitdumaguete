@@ -13,6 +13,7 @@
 
             <form class="mt-4" method="POST" action="{{ route('bookings.quotation.accept', $booking) }}">
                 @csrf
+                <input type="hidden" name="quotation_request_id" value="{{ $quotation->quotation_request_id }}">
                 <input type="hidden" name="version_number" value="{{ $quotation->version_number }}">
                 <x-button type="submit">Accept version {{ $quotation->version_number }}</x-button>
             </form>

@@ -18,9 +18,15 @@ class WorkerQuotationController extends Controller
     {
         $this->ensureAssignedWorker($request, $booking);
         $this->ensureNewQuotation($booking);
-        abort_if($booking->quotations()->exists(), 403);
 
-        $this->versions->append($booking, $this->items($request), $request->user()->id, $this->notes($request));
+        $this->versions->append(
+            $booking,
+            $this->items($request),
+            $request->user()->id,
+            $this->notes($request),
+            $this->optionalText($request, 'title'),
+            $this->optionalText($request, 'description'),
+        );
 
         return redirect()
             ->route('bookings.show', $booking)
@@ -32,7 +38,7 @@ class WorkerQuotationController extends Controller
         $this->ensureAssignedWorker($request, $booking);
         $this->ensureQuotationEdit($booking);
 
-        $this->versions->replaceDraft($this->currentDraft($booking), $this->items($request), $this->notes($request));
+        $this->versions->replaceDraft($this->currentDraft($request, $booking), $this->items($request), $this->notes($request));
 
         return redirect()
             ->route('bookings.show', $booking)
@@ -44,7 +50,7 @@ class WorkerQuotationController extends Controller
         $this->ensureAssignedWorker($request, $booking);
         $this->ensureNewQuotation($booking);
 
-        $quotation = $this->currentDraft($booking);
+        $quotation = $this->currentDraft($request, $booking);
         $quotation->load(['items', 'creator']);
 
         return view('quotations.confirm', [
@@ -58,7 +64,7 @@ class WorkerQuotationController extends Controller
         $this->ensureAssignedWorker($request, $booking);
         $this->ensureNewQuotation($booking);
 
-        $this->versions->submit($this->currentDraft($booking));
+        $this->versions->submit($this->currentDraft($request, $booking));
 
         return redirect()
             ->route('bookings.show', $booking)
@@ -70,8 +76,8 @@ class WorkerQuotationController extends Controller
         $this->ensureAssignedWorker($request, $booking);
         $this->ensureNewQuotation($booking);
 
-        $current = $booking->currentQuotation()->first();
-        abort_unless($current !== null && $current->canBeRevisedByWorker(), 403);
+        $current = $booking->currentQuotationFor($this->requestId($request), fn (Quotation $quotation) => $quotation->canBeRevisedByWorker());
+        abort_unless($current !== null, 403);
 
         $this->versions->startRevision($current, $request->user()->id);
 
@@ -97,13 +103,50 @@ class WorkerQuotationController extends Controller
         abort_unless($booking->allowsQuotationEdits(), 403);
     }
 
-    private function currentDraft(Booking $booking): Quotation
+    private function currentDraft(Request $request, Booking $booking): Quotation
     {
-        $current = $booking->currentQuotation()->first();
+        $current = $booking->currentQuotationFor(
+            $this->requestId($request),
+            fn (Quotation $quotation) => $quotation->status === 'draft',
+        );
 
-        abort_unless($current !== null && $current->status === 'draft', 403);
+        abort_unless($current !== null, 403);
 
         return $current;
+    }
+
+    private function requestId(Request $request): ?int
+    {
+        $value = $request->input('quotation_request_id');
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_numeric($value) || (string) (int) $value !== (string) $value) {
+            throw ValidationException::withMessages([
+                'quotation_request_id' => 'Choose the additional quotation to update.',
+            ]);
+        }
+
+        return (int) $value;
+    }
+
+    private function optionalText(Request $request, string $field): ?string
+    {
+        $value = $request->input($field);
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_string($value)) {
+            throw ValidationException::withMessages([
+                $field => 'Enter 2,000 characters or fewer.',
+            ]);
+        }
+
+        return $value;
     }
 
     /**

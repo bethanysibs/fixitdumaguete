@@ -1,4 +1,4 @@
-<h2 class="h5 mt-4">Payment claims</h2>
+<h2 class="h5 mt-4">Receipts you sent</h2>
 @if ($claims->isEmpty())
     <p>No payment claim has been submitted for this visit.</p>
 @else
@@ -19,7 +19,7 @@
             <tbody>
                 @foreach ($claims as $claim)
                     <tr>
-                        <td>{{ $claim->typeLabel() }} · version {{ $claim->quotation_version }}</td>
+                        <td>{{ $claim->typeLabel() }}</td>
                         <td>{{ $claim->formattedAmount() }}</td>
                         <td>{{ $claim->methodLabel() }}</td>
                         <td>{{ $claim->payment_reference ?: 'Not entered' }}</td>
