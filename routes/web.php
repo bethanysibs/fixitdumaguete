@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\QuotationController as AdminQuotationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\CustomerQuotationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MapLookupController;
@@ -68,6 +69,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/bookings/{booking}/quotation/accept', [CustomerQuotationController::class, 'confirm'])->name('bookings.quotation.confirm');
     Route::post('/bookings/{booking}/quotation/accept', [CustomerQuotationController::class, 'accept'])->name('bookings.quotation.accept');
     Route::post('/bookings/{booking}/quotation/reject', [CustomerQuotationController::class, 'reject'])->name('bookings.quotation.reject');
+    Route::get('/bookings/{booking}/payments', [CustomerPaymentController::class, 'index'])->name('bookings.payments.index');
+    Route::get('/bookings/{booking}/payments/create', [CustomerPaymentController::class, 'create'])->name('bookings.payments.create');
+    Route::post('/bookings/{booking}/payments', [CustomerPaymentController::class, 'store'])->name('bookings.payments.store');
+    Route::get('/bookings/{booking}/payments/{payment}/proof/{proof}', [CustomerPaymentController::class, 'proof'])->name('bookings.payments.proof');
     Route::get('/bookings/{booking}/photos/{photo}', [BookingController::class, 'photo'])->name('bookings.photos.show');
     Route::post('/bookings/{booking}/pay', [BookingController::class, 'pay'])->name('bookings.pay');
     Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel'])->name('bookings.cancel');

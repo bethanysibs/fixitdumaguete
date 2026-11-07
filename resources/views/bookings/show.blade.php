@@ -116,6 +116,10 @@
                         <p class="mt-4"><a href="{{ route('bookings.quotation.show', $booking) }}">Review the quotation</a></p>
                     @endif
 
+                    @if (! empty($customerCanPayQuotation))
+                        <p class="mt-3"><a href="{{ route('bookings.payments.index', $booking) }}">Submit a payment</a></p>
+                    @endif
+
                     @if (auth()->id() === $booking->customer_id && $booking->status === 'pending' && $booking->payment === null)
                         <div class="payment-panel mt-4">
                             <h2 class="h5">Record payment</h2>

@@ -8,12 +8,19 @@ use App\Models\Quotation;
 use App\Models\User;
 use App\Support\Money;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class PaymentRecorder
 {
+    public function __construct(
+        private PaymentCalculator $claims,
+        private PaymentInstructionCatalog $instructions,
+        private PaymentProofStorage $proofs,
+    ) {}
+
     public function record(
         Booking $booking,
         int $quotationId,
@@ -114,6 +121,196 @@ class PaymentRecorder
             }
 
             return $payment->refresh();
+        });
+    }
+
+    public function submit(
+        Booking $booking,
+        User $actor,
+        string $amount,
+        string $type,
+        string $method,
+        string $reference,
+        mixed $notes,
+        ?UploadedFile $proof,
+    ): Payment {
+        return DB::transaction(function () use ($booking, $actor, $amount, $type, $method, $reference, $notes, $proof) {
+            $locked = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
+
+            if ($locked === null) {
+                throw ValidationException::withMessages([
+                    'booking_id' => 'Choose a visit before submitting a payment.',
+                ]);
+            }
+
+            if ($actor->role !== 'customer' || (int) $actor->id !== (int) $locked->customer_id) {
+                throw new AuthorizationException('Only the customer who booked this visit can submit a payment.');
+            }
+
+            if (! $locked->allowsNewQuotation()) {
+                throw ValidationException::withMessages([
+                    'booking_id' => 'This visit cannot take a payment claim.',
+                ]);
+            }
+
+            $quotation = Quotation::query()
+                ->where('booking_id', $locked->id)
+                ->where('is_current', true)
+                ->lockForUpdate()
+                ->first();
+
+            if ($quotation === null || $quotation->status !== 'approved' || $quotation->customer_approved_at === null) {
+                throw ValidationException::withMessages([
+                    'quotation' => 'Accept the current quotation before submitting a payment.',
+                ]);
+            }
+
+            if (! in_array($type, ['deposit', 'balance', 'full_payment'], true)) {
+                throw ValidationException::withMessages([
+                    'payment_type' => 'Choose a deposit, balance, or full payment.',
+                ]);
+            }
+
+            if (! $this->instructions->allows($method)) {
+                throw ValidationException::withMessages([
+                    'method' => 'Choose an available payment method.',
+                ]);
+            }
+
+            $reference = trim((string) preg_replace('/\s+/', ' ', $reference));
+
+            if (! preg_match('/^[A-Za-z0-9]+(?:[ -][A-Za-z0-9]+)*$/', $reference) || strlen($reference) < 4 || strlen($reference) > 40) {
+                throw ValidationException::withMessages([
+                    'payment_reference' => 'Enter a reference number of 4 to 40 letters or numbers.',
+                ]);
+            }
+
+            if ($notes !== null && ! is_string($notes)) {
+                throw ValidationException::withMessages([
+                    'notes' => 'Enter notes of 2,000 characters or fewer.',
+                ]);
+            }
+
+            $notes = is_string($notes) ? trim($notes) : null;
+
+            if ($notes === '') {
+                $notes = null;
+            }
+
+            if ($notes !== null && strlen($notes) > 2000) {
+                throw ValidationException::withMessages([
+                    'notes' => 'Enter notes of 2,000 characters or fewer.',
+                ]);
+            }
+
+            if ($proof === null) {
+                throw ValidationException::withMessages([
+                    'proof' => 'Upload a JPG, PNG, or PDF receipt of 5 MB or less.',
+                ]);
+            }
+
+            $duplicate = Payment::query()
+                ->where('booking_id', $locked->id)
+                ->where('quotation_id', $quotation->id)
+                ->where('quotation_version', $quotation->version_number)
+                ->where('payment_type', $type)
+                ->where('method', $method)
+                ->where('payment_reference', $reference)
+                ->whereIn('status', ['pending', 'submitted'])
+                ->exists();
+
+            if ($duplicate) {
+                throw ValidationException::withMessages([
+                    'payment_reference' => 'This payment claim was already submitted.',
+                ]);
+            }
+
+            if (! preg_match('/^\d{1,10}(\.\d{1,2})?$/', $amount)) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Enter an amount with up to two decimal places.',
+                ]);
+            }
+
+            $amount = Money::normalize($amount);
+            $cents = Money::toCents($amount);
+            $room = $this->claims->claimRoom($locked);
+
+            if ($cents <= 0) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Enter an amount greater than zero.',
+                ]);
+            }
+
+            if ($cents > $room['balance_room_cents']) {
+                throw ValidationException::withMessages([
+                    'amount' => 'The amount is more than the unpaid balance.',
+                ]);
+            }
+
+            if ($type === 'deposit' && $cents > $room['deposit_room_cents']) {
+                throw ValidationException::withMessages([
+                    'amount' => 'A deposit cannot be more than the deposit still due.',
+                ]);
+            }
+
+            if ($type === 'full_payment' && $cents !== $room['balance_room_cents']) {
+                throw ValidationException::withMessages([
+                    'amount' => 'A full payment must match the unpaid balance.',
+                ]);
+            }
+
+            $snapshot = $this->financial($locked);
+            $total = (string) $quotation->total_amount;
+            $acceptedAt = $quotation->customer_approved_at->toDateTimeString();
+            $storedPath = null;
+
+            try {
+                $payment = new Payment;
+                $payment->forceFill([
+                    'booking_id' => $locked->id,
+                    'customer_id' => $locked->customer_id,
+                    'quotation_id' => $quotation->id,
+                    'quotation_version' => $quotation->version_number,
+                    'payment_type' => $type,
+                    'method' => $method,
+                    'status' => 'submitted',
+                    'verification_status' => 'pending_review',
+                    'amount' => $amount,
+                    'currency' => $quotation->currency ?: 'PHP',
+                    'payment_reference' => $reference,
+                    'submitted_by' => $actor->id,
+                    'submitted_at' => now(),
+                    'notes' => $notes,
+                    'verified_by' => null,
+                    'verified_at' => null,
+                    'paid_at' => null,
+                ])->save();
+
+                $storedPath = $this->proofs->store($payment, $proof, $actor)->file_path;
+
+                $locked->refresh();
+                $quotation->refresh();
+
+                if ($this->financial($locked) !== $snapshot
+                    || (string) $quotation->total_amount !== $total
+                    || $quotation->status !== 'approved'
+                    || $quotation->customer_approved_at?->toDateTimeString() !== $acceptedAt
+                    || $payment->status !== 'submitted'
+                    || $payment->verification_status !== 'pending_review'
+                    || $payment->verified_at !== null
+                    || $payment->paid_at !== null
+                ) {
+                    throw new RuntimeException('A payment claim changed the visit or the accepted quotation.');
+                }
+
+                return $payment->refresh();
+            } catch (\Throwable $exception) {
+                if ($storedPath !== null) {
+                    $this->proofs->delete($storedPath);
+                }
+
+                throw $exception;
+            }
         });
     }
 

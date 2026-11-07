@@ -38,6 +38,10 @@
                 @include('quotations.customer-version', ['quotation' => $quotation])
             @endforeach
 
+            @if ($current && $current->status === 'approved')
+                <p class="mt-4"><a href="{{ route('bookings.payments.index', $booking) }}">Submit a payment</a></p>
+            @endif
+
             @if ($canDecide)
                 <p class="mt-4"><a href="{{ route('bookings.quotation.confirm', $booking) }}">Accept quotation</a></p>
 

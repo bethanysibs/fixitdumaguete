@@ -75,6 +75,57 @@ class Payment extends Model
             && $this->verification_status === 'verified';
     }
 
+    public function typeLabel(): string
+    {
+        return match ($this->payment_type) {
+            'deposit' => 'Deposit',
+            'balance' => 'Balance',
+            'milestone' => 'Milestone',
+            'full_payment' => 'Full payment',
+            'adjustment' => 'Adjustment',
+            default => 'Payment',
+        };
+    }
+
+    public function methodLabel(): string
+    {
+        return match ($this->method) {
+            'gcash' => 'GCash',
+            'bank_transfer' => 'Bank transfer',
+            'cash' => 'Cash',
+            'gateway' => 'Gateway',
+            'platform' => 'Platform record',
+            'other' => 'Other',
+            default => 'Payment',
+        };
+    }
+
+    public function customerStatusLabel(): string
+    {
+        return match ($this->status) {
+            'submitted' => 'Submitted',
+            'pending' => 'Pending',
+            'verified' => 'Verified',
+            'rejected' => 'Rejected',
+            'cancelled' => 'Cancelled',
+            'refunded' => 'Refunded',
+            'partially_refunded' => 'Partly refunded',
+            'paid' => 'Recorded',
+            default => (string) $this->status,
+        };
+    }
+
+    public function customerVerificationLabel(): string
+    {
+        return match ($this->verification_status) {
+            'pending_review' => 'Waiting for review',
+            'not_submitted' => 'Not submitted',
+            'verified' => 'Verified',
+            'rejected' => 'Rejected',
+            default => (string) $this->verification_status,
+        };
+    }
+
     public function formattedAmount(): string
     {
         return Money::format((string) $this->amount);
@@ -156,6 +207,7 @@ class Payment extends Model
             'currency',
             'payment_reference',
             'submitted_by',
+            'submitted_at',
             'verified_by',
             'verified_at',
             'rejected_by',
@@ -179,6 +231,7 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'quotation_version' => 'integer',
             'paid_at' => 'datetime',
+            'submitted_at' => 'datetime',
             'verified_at' => 'datetime',
             'rejected_at' => 'datetime',
         ];
