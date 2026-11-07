@@ -16,6 +16,25 @@ class Money
         return self::fromCents(self::toCents($amount) - self::toCents($other));
     }
 
+    public static function multiply(string $quantity, string $unitPrice): string
+    {
+        return self::fromCents(intdiv(self::toCents($quantity) * self::toCents($unitPrice), 100));
+    }
+
+    /**
+     * @param  list<string>  $amounts
+     */
+    public static function sum(array $amounts): string
+    {
+        $cents = 0;
+
+        foreach ($amounts as $amount) {
+            $cents += self::toCents($amount);
+        }
+
+        return self::fromCents($cents);
+    }
+
     public static function format(string $amount): string
     {
         $cents = self::toCents($amount);

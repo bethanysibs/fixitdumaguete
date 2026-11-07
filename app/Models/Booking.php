@@ -70,6 +70,16 @@ class Booking extends Model
         return $this->hasMany(BookingPhoto::class);
     }
 
+    public function quotations(): HasMany
+    {
+        return $this->hasMany(Quotation::class)->orderBy('version_number');
+    }
+
+    public function currentQuotation(): HasOne
+    {
+        return $this->hasOne(Quotation::class)->where('is_current', true);
+    }
+
     public function statusLabel(): string
     {
         return config('marketplace.statuses.'.$this->status, $this->status);
