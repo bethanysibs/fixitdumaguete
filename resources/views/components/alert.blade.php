@@ -1,0 +1,15 @@
+@props([
+    'type' => 'info',
+    'dismissible' => false,
+])
+
+@php
+    $variant = $type === 'error' ? 'danger' : $type;
+@endphp
+
+<div {{ $attributes->merge(['class' => 'alert alert-'.$variant.($dismissible ? ' alert-dismissible fade show' : ''), 'role' => 'alert']) }}>
+    {{ $slot }}
+    @if ($dismissible)
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    @endif
+</div>
