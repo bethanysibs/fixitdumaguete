@@ -84,6 +84,9 @@
 
                     @if (auth()->user()->isAdmin())
                         <h2 class="h5 mt-4">Quotation</h2>
+                        @if ($booking->quotations->isNotEmpty())
+                            <p class="mt-3"><a href="{{ route('admin.quotations.show', $booking) }}">Review quotation</a></p>
+                        @endif
                         @forelse ($booking->quotations as $quotation)
                             @include('quotations.version', ['quotation' => $quotation])
                         @empty

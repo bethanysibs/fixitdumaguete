@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\CommissionController as AdminCommissionController;
+use App\Http\Controllers\Admin\QuotationController as AdminQuotationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BookingController;
@@ -34,6 +35,11 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::resource('admin/users', AdminUserController::class)->names('admin.users');
     Route::get('/admin/bookings', [AdminBookingController::class, 'index'])->name('admin.bookings.index');
     Route::put('/admin/bookings/{booking}', [AdminBookingController::class, 'update'])->name('admin.bookings.update');
+    Route::get('/admin/bookings/{booking}/quotation', [AdminQuotationController::class, 'show'])->name('admin.quotations.show');
+    Route::put('/admin/bookings/{booking}/quotation', [AdminQuotationController::class, 'update'])->name('admin.quotations.update');
+    Route::get('/admin/bookings/{booking}/quotation/approve', [AdminQuotationController::class, 'confirm'])->name('admin.quotations.confirm');
+    Route::post('/admin/bookings/{booking}/quotation/approve', [AdminQuotationController::class, 'approve'])->name('admin.quotations.approve');
+    Route::post('/admin/bookings/{booking}/quotation/reject', [AdminQuotationController::class, 'reject'])->name('admin.quotations.reject');
     Route::get('/admin/commission', [AdminCommissionController::class, 'index'])->name('admin.commission.index');
     Route::post('/admin/commission', [AdminCommissionController::class, 'store'])->name('admin.commission.store');
     Route::get('/admin/users/{user}/profile', [WorkerProfileEditorController::class, 'create'])->name('admin.workers.create');

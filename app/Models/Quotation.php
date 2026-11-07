@@ -22,6 +22,7 @@ class Quotation extends Model
         'submitted',
         'superseded',
         'approved',
+        'admin_approved',
         'rejected',
         'expired',
     ];
@@ -48,6 +49,34 @@ class Quotation extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function sourceQuotation(): BelongsTo
+    {
+        return $this->belongsTo(Quotation::class, 'source_quotation_id');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'admin_approved_by');
+    }
+
+    public function rejector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function canBeRevisedByWorker(): bool
+    {
+        if (! $this->is_current) {
+            return false;
+        }
+
+        if ($this->status === 'rejected') {
+            return true;
+        }
+
+        return $this->status === 'submitted' && ! $this->is_admin_adjustment;
+    }
+
     public function statusLabel(): string
     {
         return match ($this->status) {
@@ -55,6 +84,7 @@ class Quotation extends Model
             'submitted' => 'Submitted',
             'superseded' => 'Superseded',
             'approved' => 'Approved',
+            'admin_approved' => 'Approved for customer review',
             'rejected' => 'Rejected',
             'expired' => 'Expired',
             default => $this->status,
@@ -78,7 +108,10 @@ class Quotation extends Model
             'subtotal' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'is_current' => 'boolean',
+            'is_admin_adjustment' => 'boolean',
             'submitted_at' => 'datetime',
+            'admin_approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
         ];
     }
 }

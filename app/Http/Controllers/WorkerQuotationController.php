@@ -71,7 +71,7 @@ class WorkerQuotationController extends Controller
         $this->ensureNewQuotation($booking);
 
         $current = $booking->currentQuotation()->first();
-        abort_unless($current !== null && $current->status === 'submitted', 403);
+        abort_unless($current !== null && $current->canBeRevisedByWorker(), 403);
 
         $this->versions->startRevision($current, $request->user()->id);
 

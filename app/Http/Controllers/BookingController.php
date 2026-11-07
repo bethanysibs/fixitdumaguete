@@ -136,7 +136,13 @@ class BookingController extends Controller
         $booking->load(['customer', 'workerProfile.user', 'service.category', 'location', 'payment', 'photos']);
 
         if ($request->user()->isAdmin() || $request->user()->id === $booking->workerProfile?->user_id) {
-            $booking->load(['quotations.items', 'quotations.creator']);
+            $booking->load([
+                'quotations.items',
+                'quotations.creator',
+                'quotations.sourceQuotation',
+                'quotations.approver',
+                'quotations.rejector',
+            ]);
         }
 
         return view('bookings.show', [
