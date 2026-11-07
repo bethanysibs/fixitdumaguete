@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'effective_at',
-    'default_rate',
     'first_booking_rate',
     'repeat_booking_rate',
     'basis',
@@ -47,7 +46,6 @@ class CommissionSetting extends Model
     {
         return [
             'effective_at' => 'datetime',
-            'default_rate' => 'decimal:2',
             'first_booking_rate' => 'decimal:2',
             'repeat_booking_rate' => 'decimal:2',
             'minimum_amount' => 'decimal:2',

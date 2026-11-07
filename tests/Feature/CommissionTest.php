@@ -3,12 +3,16 @@
 namespace Tests\Feature;
 
 use App\Models\Booking;
+use App\Models\CommissionSetting;
 use App\Models\Payment;
 use App\Models\ServiceCategory;
 use App\Models\User;
 use App\Models\WorkerProfile;
+use App\Services\CommissionCalculator;
 use Database\Seeders\DemoMarketplaceSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class CommissionTest extends TestCase
@@ -183,6 +187,125 @@ class CommissionTest extends TestCase
         $this->assertSame('800.00', $lowered->worker_amount);
     }
 
+    public function test_zero_percent_full_percent_and_a_minimum_above_the_price(): void
+    {
+        $admin = User::query()->where('email', 'admin@fixitdumaguete.test')->firstOrFail();
+        $customer = User::query()->where('email', 'customer@fixitdumaguete.test')->firstOrFail();
+        $worker = WorkerProfile::query()->where('slug', 'andres-villanueva')->firstOrFail();
+
+        $this->actingAs($admin)->post(route('admin.commission.store'), $this->version([
+            'first_booking_rate' => '0.00',
+        ]))->assertRedirect();
+
+        $free = $this->book($customer, $worker);
+        $this->assertSame('0.00', $free->commission_original_rate);
+        $this->assertNull($free->commission_adjustment);
+        $this->assertSame('0.00', $free->commission_amount);
+        $this->assertSame('850.00', $free->worker_amount);
+
+        $this->actingAs($admin)->post(route('admin.commission.store'), $this->version([
+            'first_booking_rate' => '100.00',
+        ]))->assertRedirect();
+
+        $full = $this->book($customer, $worker);
+        $this->assertSame('100.00', $full->commission_original_rate);
+        $this->assertNull($full->commission_adjustment);
+        $this->assertSame('850.00', $full->commission_amount);
+        $this->assertSame('0.00', $full->worker_amount);
+
+        $this->actingAs($admin)->post(route('admin.commission.store'), $this->version([
+            'first_booking_rate' => '10.00',
+            'minimum_amount' => '1000.00',
+        ]))->assertRedirect();
+
+        $capped = $this->book($customer, $worker);
+        $this->assertSame('10.00', $capped->commission_original_rate);
+        $this->assertSame('entire_service', $capped->commission_basis);
+        $this->assertSame('850.00', $capped->commission_base_amount);
+        $this->assertSame('765.00', $capped->commission_adjustment);
+        $this->assertSame('850.00', $capped->commission_amount);
+        $this->assertSame('0.00', $capped->worker_amount);
+    }
+
+    public function test_labor_bases_cannot_be_saved_and_snapshots_keep_the_service_price(): void
+    {
+        $admin = User::query()->where('email', 'admin@fixitdumaguete.test')->firstOrFail();
+        $customer = User::query()->where('email', 'customer@fixitdumaguete.test')->firstOrFail();
+        $worker = WorkerProfile::query()->where('slug', 'andres-villanueva')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('admin.commission.index'))
+            ->assertOk()
+            ->assertDontSee('Default percentage')
+            ->assertSee('Labor amount — not available yet', false)
+            ->assertSee('value="labor" disabled', false);
+
+        $this->assertFalse(Schema::hasColumn('commission_settings', 'default_rate'));
+
+        $before = CommissionSetting::query()->count();
+
+        foreach (['labor', 'labor_and_charges'] as $basis) {
+            $this->actingAs($admin)
+                ->post(route('admin.commission.store'), $this->version(['basis' => $basis]))
+                ->assertSessionHasErrors('basis');
+        }
+
+        $this->assertSame($before, CommissionSetting::query()->count());
+
+        CommissionSetting::query()->create([
+            'effective_at' => now(),
+            'first_booking_rate' => '10.00',
+            'repeat_booking_rate' => '5.00',
+            'basis' => 'labor',
+            'created_by' => $admin->id,
+        ]);
+
+        $booking = $this->book($customer, $worker);
+        $this->assertSame('entire_service', $booking->commission_basis);
+        $this->assertSame('850.00', $booking->commission_base_amount);
+        $this->assertSame('85.00', $booking->commission_amount);
+        $this->assertSame('765.00', $booking->worker_amount);
+    }
+
+    public function test_a_refunded_payment_does_not_qualify_and_a_second_payment_is_rejected(): void
+    {
+        $customer = User::query()->where('email', 'customer@fixitdumaguete.test')->firstOrFail();
+        $worker = WorkerProfile::query()->where('slug', 'andres-villanueva')->firstOrFail();
+        $calculator = app(CommissionCalculator::class);
+
+        $booking = $this->book($customer, $worker);
+        $booking->update(['status' => 'completed']);
+        $payment = Payment::query()->create([
+            'booking_id' => $booking->id,
+            'customer_id' => $customer->id,
+            'amount' => $booking->price_amount,
+            'status' => 'paid',
+            'method' => 'platform',
+            'paid_at' => now(),
+        ]);
+
+        $this->assertTrue($calculator->hasCompletedPaidBooking($customer->id, $worker->id));
+
+        try {
+            Payment::query()->create([
+                'booking_id' => $booking->id,
+                'customer_id' => $customer->id,
+                'amount' => $booking->price_amount,
+                'status' => 'refunded',
+                'method' => 'platform',
+                'paid_at' => now(),
+            ]);
+            $this->fail('A booking stored a second payment.');
+        } catch (QueryException) {
+            $this->assertSame(1, Payment::query()->where('booking_id', $booking->id)->count());
+        }
+
+        $payment->update(['status' => 'refunded']);
+
+        $this->assertFalse($calculator->hasCompletedPaidBooking($customer->id, $worker->id));
+        $this->assertSame('first', $this->book($customer, $worker)->commission_rule);
+    }
+
     public function test_a_new_commission_version_does_not_change_an_existing_booking(): void
     {
         $admin = User::query()->where('email', 'admin@fixitdumaguete.test')->firstOrFail();
@@ -223,7 +346,6 @@ class CommissionTest extends TestCase
     {
         return array_merge([
             'effective_at' => now()->format('Y-m-d H:i:s'),
-            'default_rate' => '10.00',
             'first_booking_rate' => '10.00',
             'repeat_booking_rate' => '5.00',
             'basis' => 'entire_service',

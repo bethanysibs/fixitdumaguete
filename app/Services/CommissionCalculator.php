@@ -29,6 +29,8 @@ class CommissionCalculator
             ? Money::normalize($rule['rate'])
             : Money::normalize((string) config('marketplace.commission_rate'));
         $base = $serviceAmount;
+        // Bookings have no labor or service-charge lines yet, so the snapshot
+        // records the service price even if an older version names another basis.
         $basis = 'entire_service';
         $calculated = Money::commission($base, $rate);
         $bounded = Money::bound(
@@ -65,6 +67,7 @@ class CommissionCalculator
             ->where('worker_profile_id', $workerProfileId)
             ->where('status', 'completed')
             ->whereHas('payment', fn ($query) => $query->where('status', 'paid'))
+            ->whereDoesntHave('payment', fn ($query) => $query->where('status', 'refunded'))
             ->exists();
     }
 

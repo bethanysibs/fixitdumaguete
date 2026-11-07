@@ -15,20 +15,17 @@
                     <div class="col-md-4">
                         <x-form-input name="effective_at" type="datetime-local" label="Effective" :value="old('effective_at', now()->format('Y-m-d\TH:i'))" required />
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-8">
                         <label class="form-label" for="basis">Basis</label>
                         <select class="form-select" id="basis" name="basis">
-                            @foreach (['entire_service' => 'Entire service amount', 'labor' => 'Labor amount', 'labor_and_charges' => 'Labor plus service charges'] as $value => $label)
-                                <option value="{{ $value }}" @selected(old('basis', 'entire_service') === $value)>{{ $label }}</option>
-                            @endforeach
+                            <option value="entire_service" selected>Entire service amount</option>
+                            <option value="labor" disabled>Labor amount — not available yet</option>
+                            <option value="labor_and_charges" disabled>Labor plus service charges — not available yet</option>
                         </select>
-                        <div class="form-text">Until a booking has separate labor lines, the service price is the amount used.</div>
+                        <div class="form-text">Labor and service charges cannot be selected yet. Every booking uses the service price, and the snapshot records that basis.</div>
                     </div>
                 </div>
                 <div class="row g-3">
-                    <div class="col-md-4">
-                        <x-form-input name="default_rate" label="Default percentage" :value="old('default_rate', '10.00')" required />
-                    </div>
                     <div class="col-md-4">
                         <x-form-input name="first_booking_rate" label="First booking percentage" :value="old('first_booking_rate', '10.00')" required />
                     </div>
@@ -90,7 +87,12 @@
                                 </td>
                                 <td>{{ $version->first_booking_rate }}%</td>
                                 <td>{{ $version->repeat_booking_rate }}%</td>
-                                <td>{{ $version->basisLabel() }}</td>
+                                <td>
+                                    {{ $version->basisLabel() }}
+                                    @if ($version->basis !== 'entire_service')
+                                        <div class="small">Not applied. Bookings use the service price.</div>
+                                    @endif
+                                </td>
                                 <td>
                                     {{ $version->minimum_amount ? \App\Support\Money::format((string) $version->minimum_amount) : 'No minimum' }}
                                     /

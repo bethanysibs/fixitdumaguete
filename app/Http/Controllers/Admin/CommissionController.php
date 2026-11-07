@@ -33,19 +33,20 @@ class CommissionController extends Controller
 
         $data = $request->validate([
             'effective_at' => ['required', 'date'],
-            'default_rate' => ['required', 'regex:/^\d{1,3}(\.\d{1,2})?$/'],
             'first_booking_rate' => ['required', 'regex:/^\d{1,3}(\.\d{1,2})?$/'],
             'repeat_booking_rate' => ['required', 'regex:/^\d{1,3}(\.\d{1,2})?$/'],
-            'basis' => ['required', Rule::in(['entire_service', 'labor', 'labor_and_charges'])],
+            'basis' => ['required', Rule::in(['entire_service'])],
             'minimum_amount' => ['nullable', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
             'maximum_amount' => ['nullable', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
             'category_rates' => ['nullable', 'array'],
             'category_rates.*' => ['nullable', 'regex:/^\d{1,3}(\.\d{1,2})?$/'],
             'worker_rates' => ['nullable', 'array'],
             'worker_rates.*' => ['nullable', 'regex:/^\d{1,3}(\.\d{1,2})?$/'],
+        ], [
+            'basis.in' => 'Labor amounts are not available yet. Use the entire service amount.',
         ]);
 
-        foreach (['default_rate', 'first_booking_rate', 'repeat_booking_rate'] as $field) {
+        foreach (['first_booking_rate', 'repeat_booking_rate'] as $field) {
             $this->assertPercentage($data[$field], $field);
             $data[$field] = Money::normalize($data[$field]);
         }
@@ -96,7 +97,6 @@ class CommissionController extends Controller
         DB::transaction(function () use ($request, $data, $minimum, $maximum, $categoryRates, $workerRates) {
             $setting = CommissionSetting::query()->create([
                 'effective_at' => $data['effective_at'],
-                'default_rate' => $data['default_rate'],
                 'first_booking_rate' => $data['first_booking_rate'],
                 'repeat_booking_rate' => $data['repeat_booking_rate'],
                 'basis' => $data['basis'],
