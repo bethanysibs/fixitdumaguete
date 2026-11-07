@@ -26,6 +26,20 @@ class QuotationItem extends Model
         'other',
     ];
 
+    /**
+     * @return array<string, string>
+     */
+    public static function typeOptions(): array
+    {
+        return [
+            'labor' => 'Labor',
+            'material' => 'Material',
+            'service_charge' => 'Service charge',
+            'inspection_fee' => 'Inspection fee',
+            'other' => 'Other',
+        ];
+    }
+
     public function quotation(): BelongsTo
     {
         return $this->belongsTo(Quotation::class);
@@ -33,14 +47,7 @@ class QuotationItem extends Model
 
     public function typeLabel(): string
     {
-        return match ($this->item_type) {
-            'labor' => 'Labor',
-            'material' => 'Material',
-            'service_charge' => 'Service charge',
-            'inspection_fee' => 'Inspection fee',
-            'other' => 'Other',
-            default => $this->item_type,
-        };
+        return self::typeOptions()[$this->item_type] ?? $this->item_type;
     }
 
     public function formattedUnitPrice(): string

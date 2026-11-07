@@ -78,6 +78,7 @@ class Quotation extends Model
             'subtotal' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'is_current' => 'boolean',
+            'submitted_at' => 'datetime',
         ];
     }
 }

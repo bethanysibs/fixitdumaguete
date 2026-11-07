@@ -85,6 +85,16 @@ class Booking extends Model
         return config('marketplace.statuses.'.$this->status, $this->status);
     }
 
+    public function allowsNewQuotation(): bool
+    {
+        return in_array($this->status, ['pending', 'confirmed', 'in_progress'], true);
+    }
+
+    public function allowsQuotationEdits(): bool
+    {
+        return $this->allowsNewQuotation() || $this->status === 'completed';
+    }
+
     public function formattedPrice(): string
     {
         return Money::format((string) $this->price_amount);

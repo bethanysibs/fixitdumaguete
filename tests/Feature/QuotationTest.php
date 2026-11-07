@@ -183,6 +183,7 @@ class QuotationTest extends TestCase
             'subtotal' => '5.00',
             'total_amount' => '5.00',
             'is_current' => true,
+            'submitted_at' => now()->toDateTimeString(),
         ]);
         $item = new QuotationItem([
             'line_total' => '999.00',
@@ -192,10 +193,11 @@ class QuotationTest extends TestCase
         $this->assertNull($quotation->subtotal);
         $this->assertNull($quotation->total_amount);
         $this->assertNull($quotation->is_current);
+        $this->assertNull($quotation->submitted_at);
         $this->assertNull($item->line_total);
     }
 
-    public function test_only_an_admin_can_view_quotations_for_a_booking(): void
+    public function test_customers_and_unrelated_workers_cannot_view_quotations(): void
     {
         $booking = $this->booking();
         $admin = User::query()->where('email', 'admin@fixitdumaguete.test')->firstOrFail();
@@ -230,6 +232,7 @@ class QuotationTest extends TestCase
             ->assertSee('₱200.00')
             ->assertSee('First visit price.')
             ->assertSee($admin->name)
+            ->assertDontSee('Save draft')
             ->assertDontSee('Approve')
             ->assertDontSee('Reject');
 
@@ -243,8 +246,9 @@ class QuotationTest extends TestCase
         $this->actingAs($worker)
             ->get(route('bookings.show', $booking))
             ->assertOk()
-            ->assertDontSee('Quotation')
-            ->assertDontSee('Replace the kitchen trap');
+            ->assertSee('Quotation')
+            ->assertSee('Replace the kitchen trap')
+            ->assertSee('Save draft');
 
         $this->actingAs($otherCustomer)
             ->get(route('bookings.show', $booking))

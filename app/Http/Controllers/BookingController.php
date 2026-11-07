@@ -133,14 +133,11 @@ class BookingController extends Controller
     {
         abort_unless($booking->visibleTo($request->user()), 403);
 
-        $relations = ['customer', 'workerProfile.user', 'service.category', 'location', 'payment', 'photos'];
+        $booking->load(['customer', 'workerProfile.user', 'service.category', 'location', 'payment', 'photos']);
 
-        if ($request->user()->isAdmin()) {
-            $relations[] = 'quotations.items';
-            $relations[] = 'quotations.creator';
+        if ($request->user()->isAdmin() || $request->user()->id === $booking->workerProfile?->user_id) {
+            $booking->load(['quotations.items', 'quotations.creator']);
         }
-
-        $booking->load($relations);
 
         return view('bookings.show', [
             'booking' => $booking,
