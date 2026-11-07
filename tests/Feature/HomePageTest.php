@@ -78,6 +78,6 @@ class HomePageTest extends TestCase
     {
         $this->get('/login')->assertOk();
         $this->get('/register')->assertNotFound();
-        $this->get('/admin')->assertNotFound();
+        $this->get('/admin')->assertRedirect(route('login'));
     }
 }

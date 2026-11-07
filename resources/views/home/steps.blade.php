@@ -2,8 +2,8 @@
     <div class="container">
         <div class="row section-heading">
             <div class="col-lg-8">
-                <h2 id="how-title">How a booking will work</h2>
-                <p class="section-intro mb-0">Customers will book only after they have an account. Workers will not be publicly bookable until they are verified.</p>
+                <h2 id="how-title">How a booking works</h2>
+                <p class="section-intro mb-0">Sign in as a customer, choose an approved professional, and record the payment in your account. A worker appears for booking only after the platform has approved that profile.</p>
             </div>
         </div>
         <ol class="row g-4 list-unstyled mb-0">

@@ -45,7 +45,7 @@ class DemoMarketplaceSeeder extends Seeder
                 [
                     'slug' => $slug,
                     'headline' => $category->name.' in '.$location->name,
-                    'bio' => 'Sample profile for the local preview. This is not a real FixItDumaguete worker, and this profile cannot be booked.',
+                    'bio' => 'Sample profile for the local preview. This is not a real FixItDumaguete worker. A booking on this profile is a preview, and the payment is recorded on the site.',
                     'verification_status' => 'approved',
                     'is_sample' => true,
                 ],
@@ -82,6 +82,8 @@ class DemoMarketplaceSeeder extends Seeder
                     'province' => $location['province'],
                     'summary' => $location['summary'],
                     'is_active' => true,
+                    'map_latitude' => $location['map_latitude'] ?? null,
+                    'map_longitude' => $location['map_longitude'] ?? null,
                 ],
             );
 

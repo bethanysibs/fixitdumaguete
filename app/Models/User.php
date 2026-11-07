@@ -34,6 +34,11 @@ class User extends Authenticatable
         return $this->hasMany(WorkerRating::class);
     }
 
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'customer_id');
+    }
+
     public function canRateWorkers(): bool
     {
         return in_array($this->role, ['customer', 'admin'], true);

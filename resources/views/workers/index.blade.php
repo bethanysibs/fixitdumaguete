@@ -15,7 +15,7 @@
             <div class="row section-heading mt-4">
                 <div class="col-lg-8">
                     <h1>A sample professional for each service</h1>
-                    <p class="lede mb-0">Search the preview professionals, then narrow the list by service, municipality, or price. Every sample card is labeled. None of these people can be booked yet, and a star rating appears only after a customer or an admin sets one.</p>
+                    <p class="lede mb-0">Search the preview professionals, then narrow the list by service, municipality, or price. Every sample card is labeled. Open a profile to book a visit.</p>
                 </div>
             </div>
 
@@ -72,6 +72,7 @@
                             @foreach ($services as $service)
                                 <div class="col-sm-6 col-xl-4">
                                     <article class="worker-card">
+                                        <x-profile-photo :profile="$service->workerProfile" class="profile-photo-card" />
                                         @if ($service->workerProfile->is_sample)
                                             <span class="sample-badge">Sample</span>
                                         @endif

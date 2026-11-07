@@ -16,6 +16,9 @@ class WorkerProfileController extends Controller
             'locations',
             'services.category',
             'ratings.user',
+            'skills',
+            'projects',
+            'portfolioImages',
         ]);
         $workerProfile->loadCount('ratings');
         $workerProfile->loadAvg('ratings', 'score');

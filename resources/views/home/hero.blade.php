@@ -4,12 +4,12 @@
             <div class="col-lg-7">
                 <p class="eyebrow">Dumaguete City · Sibulan · Dauin</p>
                 <h1>{{ config('brand.tagline') }}</h1>
-                <p class="hero-lede">{{ config('brand.name') }} is a local marketplace for home repairs and upkeep in Negros Oriental. Households will be able to compare verified workers and book them through the website.</p>
+                <p class="hero-lede">{{ config('brand.name') }} is a local marketplace for home repairs and upkeep in Negros Oriental. Compare professionals, book a visit, and record the payment in your account.</p>
                 <div class="d-flex flex-wrap gap-3 mt-4">
-                    <x-button href="{{ route('home') }}#services" variant="secondary">See services</x-button>
-                    <x-button href="{{ route('home') }}#locations" variant="outline-light">See coverage</x-button>
+                    <x-button href="{{ route('workers.index') }}" variant="secondary">See professionals</x-button>
+                    <x-button href="{{ route('home') }}#services" variant="outline-light">See services</x-button>
                 </div>
-                <p class="hero-note">Online booking is not open in this release yet. The page below shows the services and municipalities the platform is being built to cover.</p>
+                <p class="hero-note">Open a professional, describe the job, and record the payment on the platform. No card is charged. An admin marks the visit in progress, done, or canceled.</p>
             </div>
             <div class="col-lg-5">
                 <aside class="booking-preview" aria-labelledby="booking-preview-title">
@@ -23,7 +23,7 @@
                         <dt>Notes</dt>
                         <dd>A short description of the problem</dd>
                     </dl>
-                    <p class="small muted mb-0">This is a sample of the booking form. It is not a live request, and no worker is assigned.</p>
+                    <p class="small muted mb-0">A real request starts on a professional’s page. You choose the time, the municipality, and the job notes there.</p>
                 </aside>
             </div>
         </div>

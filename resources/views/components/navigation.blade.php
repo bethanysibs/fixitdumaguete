@@ -18,6 +18,26 @@
                         </li>
                     @endforeach
                     @auth
+                        @if (auth()->user()->role === 'customer')
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('bookings.index') }}">Bookings</a>
+                            </li>
+                        @elseif (auth()->user()->role === 'worker')
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('jobs.index') }}">Jobs</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('work.edit') }}">Profile</a>
+                            </li>
+                        @endif
+                        @if (auth()->user()->isAdmin())
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('admin.users.index') }}">Accounts</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('admin.bookings.index') }}">Bookings</a>
+                            </li>
+                        @endif
                         <li class="nav-item">
                             <span class="nav-link">{{ auth()->user()->name }}</span>
                         </li>

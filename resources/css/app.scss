@@ -71,6 +71,140 @@ $focus-ring-color: rgba(227, 106, 27, 0.45);
     color: #fff;
 }
 
+.admin-panel,
+.admin-filters {
+    background: #fff;
+    border: 1px solid rgba(11, 31, 58, 0.08);
+    border-radius: 1rem;
+    padding: 1.25rem 1.2rem;
+}
+
+.admin-table {
+    background: #fff;
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.account-details {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.account-details dt {
+    color: #5c6b7c;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.account-details dd {
+    margin: 0;
+    font-weight: 700;
+}
+
+.status-pill {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+    background: #e7eef6;
+    color: #0b1f3a;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.status-confirmed,
+.status-in_progress {
+    background: #fff1e6;
+    color: #9a4310;
+}
+
+.status-completed {
+    background: #e5f6ee;
+    color: #0d6b3d;
+}
+
+.status-canceled {
+    background: #fde8e8;
+    color: #9b1c1c;
+}
+
+.pac-container {
+    z-index: 2000;
+}
+
+.visit-map {
+    height: 320px;
+    border-radius: 1rem;
+    border: 1px solid rgba(11, 31, 58, 0.12);
+    background: #e7eef6;
+}
+
+.portfolio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+}
+
+.portfolio-grid img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 0.75rem;
+    background: #e7eef6;
+}
+
+.skill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.skill-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    background: #fff;
+    border: 1px solid rgba(11, 31, 58, 0.12);
+    font-weight: 700;
+}
+
+.payment-panel {
+    background: #fff;
+    border: 1px solid rgba(11, 31, 58, 0.08);
+    border-radius: 1rem;
+    padding: 1.25rem 1.2rem;
+}
+
+.profile-photo {
+    display: block;
+    object-fit: cover;
+    background: #0b1f3a;
+    color: #fff;
+}
+
+.profile-photo-card {
+    width: calc(100% + 2.7rem);
+    height: 180px;
+    margin: -1.45rem -1.35rem 1rem;
+    border-radius: 1rem 1rem 0 0;
+}
+
+.profile-photo-profile {
+    width: 7.5rem;
+    height: 7.5rem;
+    border-radius: 1rem;
+}
+
+.profile-photo-empty {
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
 .shop-filters,
 .rating-panel {
     background: #fff;
@@ -509,6 +643,16 @@ a.service-card:focus h3 {
 .worker-card {
     display: flex;
     flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.worker-card .sample-badge {
+    position: absolute;
+    z-index: 1;
+    top: 0.75rem;
+    left: 0.75rem;
+    margin-bottom: 0;
 }
 
 .sample-badge {

@@ -152,16 +152,22 @@ return [
             'name' => 'Dumaguete City',
             'province' => 'Negros Oriental',
             'summary' => 'The city proper, including houses, apartments, and small shops across its barangays.',
+            'map_latitude' => '9.3068400',
+            'map_longitude' => '123.3054470',
         ],
         [
             'name' => 'Sibulan',
             'province' => 'Negros Oriental',
             'summary' => 'The municipality north of Dumaguete, from the poblacion toward the airport and the coast.',
+            'map_latitude' => '9.3583000',
+            'map_longitude' => '123.2847000',
         ],
         [
             'name' => 'Dauin',
             'province' => 'Negros Oriental',
             'summary' => 'The municipality south of Dumaguete, including residential streets and coastal communities.',
+            'map_latitude' => '9.1907000',
+            'map_longitude' => '123.2658000',
         ],
     ],
 
