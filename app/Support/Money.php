@@ -48,4 +48,42 @@ class Money
 
         return $sign.intdiv($cents, 100).'.'.str_pad((string) ($cents % 100), 2, '0', STR_PAD_LEFT);
     }
+
+    public static function normalize(string $amount): string
+    {
+        $negative = str_starts_with($amount, '-');
+        $amount = ltrim($amount, '-');
+
+        if (! str_contains($amount, '.')) {
+            $amount .= '.00';
+        }
+
+        [$whole, $fraction] = explode('.', $amount, 2);
+
+        return ($negative ? '-' : '').((int) $whole).'.'.str_pad(substr($fraction, 0, 2), 2, '0');
+    }
+
+    /**
+     * @return array{amount: string, adjustment: string|null}
+     */
+    public static function bound(string $amount, ?string $minimum, ?string $maximum): array
+    {
+        $original = self::toCents($amount);
+        $cents = $original;
+
+        if ($minimum !== null && $cents < self::toCents($minimum)) {
+            $cents = self::toCents($minimum);
+        }
+
+        if ($maximum !== null && $cents > self::toCents($maximum)) {
+            $cents = self::toCents($maximum);
+        }
+
+        $adjustment = $cents - $original;
+
+        return [
+            'amount' => self::fromCents($cents),
+            'adjustment' => $adjustment === 0 ? null : self::fromCents($adjustment),
+        ];
+    }
 }

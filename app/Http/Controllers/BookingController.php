@@ -6,7 +6,7 @@ use App\Models\Booking;
 use App\Models\BookingPhoto;
 use App\Models\Payment;
 use App\Models\WorkerProfile;
-use App\Support\Money;
+use App\Services\CommissionCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,11 +81,15 @@ class BookingController extends Controller
         }
 
         $service = $workerProfile->services->firstWhere('id', (int) $data['service_id']);
-        $rate = (string) config('marketplace.commission_rate');
         $price = (string) $service->price_amount;
-        $commission = Money::commission($price, $rate);
+        $commission = app(CommissionCalculator::class)->quote(
+            $request->user()->id,
+            $workerProfile->id,
+            $service->service_category_id,
+            $price,
+        );
 
-        $booking = DB::transaction(function () use ($request, $workerProfile, $service, $data, $latitude, $longitude, $price, $rate, $commission) {
+        $booking = DB::transaction(function () use ($request, $workerProfile, $service, $data, $latitude, $longitude, $price, $commission) {
             $booking = Booking::query()->create([
                 'customer_id' => $request->user()->id,
                 'worker_profile_id' => $workerProfile->id,
@@ -100,9 +104,15 @@ class BookingController extends Controller
                 'notes' => $data['notes'],
                 'status' => 'pending',
                 'price_amount' => $price,
-                'commission_rate' => $rate,
-                'commission_amount' => $commission,
-                'worker_amount' => Money::subtract($price, $commission),
+                'commission_rate' => $commission['original_rate'],
+                'commission_amount' => $commission['amount'],
+                'worker_amount' => $commission['worker_amount'],
+                'commission_setting_id' => $commission['setting_id'],
+                'commission_rule' => $commission['rule'],
+                'commission_basis' => $commission['basis'],
+                'commission_base_amount' => $commission['base_amount'],
+                'commission_original_rate' => $commission['original_rate'],
+                'commission_adjustment' => $commission['adjustment'],
             ]);
 
             foreach ($request->file('photos', []) as $photo) {

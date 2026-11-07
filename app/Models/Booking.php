@@ -26,6 +26,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'commission_rate',
     'commission_amount',
     'worker_amount',
+    'commission_setting_id',
+    'commission_rule',
+    'commission_basis',
+    'commission_base_amount',
+    'commission_original_rate',
+    'commission_adjustment',
 ])]
 class Booking extends Model
 {
@@ -54,6 +60,11 @@ class Booking extends Model
         return $this->hasOne(Payment::class);
     }
 
+    public function commissionSetting(): BelongsTo
+    {
+        return $this->belongsTo(CommissionSetting::class);
+    }
+
     public function photos(): HasMany
     {
         return $this->hasMany(BookingPhoto::class);
@@ -67,6 +78,17 @@ class Booking extends Model
     public function formattedPrice(): string
     {
         return Money::format((string) $this->price_amount);
+    }
+
+    public function commissionRuleLabel(): string
+    {
+        return match ($this->commission_rule) {
+            'worker' => 'Worker rate',
+            'category' => 'Category rate',
+            'repeat' => 'Repeat booking',
+            'first' => 'First booking',
+            default => 'Saved with the booking',
+        };
     }
 
     public function visibleTo(?User $user): bool
@@ -90,6 +112,9 @@ class Booking extends Model
             'commission_rate' => 'decimal:2',
             'commission_amount' => 'decimal:2',
             'worker_amount' => 'decimal:2',
+            'commission_base_amount' => 'decimal:2',
+            'commission_original_rate' => 'decimal:2',
+            'commission_adjustment' => 'decimal:2',
         ];
     }
 }

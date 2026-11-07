@@ -49,8 +49,22 @@
                         @if (auth()->user()->isAdmin() || auth()->id() === $booking->workerProfile->user_id)
                             <div>
                                 <dt>Platform commission</dt>
-                                <dd>{{ \App\Support\Money::format((string) $booking->commission_amount) }} ({{ $booking->commission_rate }}%)</dd>
+                                <dd>{{ \App\Support\Money::format((string) $booking->commission_amount) }} ({{ $booking->commission_original_rate ?: $booking->commission_rate }}%)</dd>
                             </div>
+                            @if ($booking->commission_rule)
+                                <div>
+                                    <dt>Commission rule</dt>
+                                    <dd>{{ $booking->commissionRuleLabel() }}@if ($booking->commission_setting_id) · version {{ $booking->commission_setting_id }}@endif</dd>
+                                </div>
+                                <div>
+                                    <dt>Calculation base</dt>
+                                    <dd>{{ \App\Support\Money::format((string) $booking->commission_base_amount) }} · {{ $booking->commission_basis === 'entire_service' ? 'Entire service amount' : $booking->commission_basis }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Minimum or maximum adjustment</dt>
+                                    <dd>{{ $booking->commission_adjustment !== null ? \App\Support\Money::format((string) $booking->commission_adjustment) : 'None' }}</dd>
+                                </div>
+                            @endif
                             <div>
                                 <dt>Worker earnings</dt>
                                 <dd>{{ \App\Support\Money::format((string) $booking->worker_amount) }}</dd>

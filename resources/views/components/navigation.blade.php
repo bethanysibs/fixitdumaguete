@@ -37,6 +37,9 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ route('admin.bookings.index') }}">Bookings</a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('admin.commission.index') }}">Commission</a>
+                            </li>
                         @endif
                         <li class="nav-item">
                             <span class="nav-link">{{ auth()->user()->name }}</span>

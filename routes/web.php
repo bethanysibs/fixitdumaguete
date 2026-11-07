@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BookingController;
@@ -32,6 +33,8 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::resource('admin/users', AdminUserController::class)->names('admin.users');
     Route::get('/admin/bookings', [AdminBookingController::class, 'index'])->name('admin.bookings.index');
     Route::put('/admin/bookings/{booking}', [AdminBookingController::class, 'update'])->name('admin.bookings.update');
+    Route::get('/admin/commission', [AdminCommissionController::class, 'index'])->name('admin.commission.index');
+    Route::post('/admin/commission', [AdminCommissionController::class, 'store'])->name('admin.commission.store');
     Route::get('/admin/users/{user}/profile', [WorkerProfileEditorController::class, 'create'])->name('admin.workers.create');
     Route::post('/admin/users/{user}/profile', [WorkerProfileEditorController::class, 'store'])->name('admin.workers.store');
     Route::get('/admin/workers/{workerProfile}/edit', [WorkerProfileEditorController::class, 'edit'])->name('admin.workers.edit');
