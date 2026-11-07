@@ -142,11 +142,15 @@ class BookingController extends Controller
                 'quotations.sourceQuotation',
                 'quotations.approver',
                 'quotations.rejector',
+                'quotations.customerAccepter',
+                'quotations.customerRejector',
             ]);
         }
 
         return view('bookings.show', [
             'booking' => $booking,
+            'customerCanReviewQuotation' => $request->user()->id === $booking->customer_id
+                && $booking->quotations()->whereIn('status', ['admin_approved', 'approved', 'customer_rejected'])->exists(),
         ]);
     }
 

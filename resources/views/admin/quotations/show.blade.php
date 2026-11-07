@@ -1,7 +1,7 @@
 @php
     $current = $booking->quotations->firstWhere('is_current', true);
     $canReview = $booking->allowsNewQuotation();
-    $canAdjust = $canReview && $current && in_array($current->status, ['submitted', 'admin_approved'], true);
+    $canAdjust = $canReview && $current && in_array($current->status, ['submitted', 'admin_approved', 'approved'], true);
     $canDecide = $canReview && $current && $current->status === 'submitted';
     $savedRows = $current
         ? $current->items->map(fn ($item) => [
@@ -68,6 +68,10 @@
                 <div class="alert alert-info mt-3" role="status">The worker has not submitted this draft.</div>
             @elseif ($current && $current->status === 'admin_approved')
                 <div class="alert alert-info mt-3" role="status">This quotation is approved for customer review. Changing the price or the customer note saves a new version that needs approval again.</div>
+            @elseif ($current && $current->status === 'approved')
+                <div class="alert alert-info mt-3" role="status">The customer accepted this quotation. Changing the price or the customer note saves a new version. The accepted version stays unchanged.</div>
+            @elseif ($current && $current->status === 'customer_rejected')
+                <div class="alert alert-info mt-3" role="status">The customer declined this quotation. The worker can prepare a revision.</div>
             @elseif (! $current)
                 <p class="mt-3">No quotation has been prepared for this visit.</p>
             @endif

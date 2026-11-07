@@ -192,6 +192,11 @@ class QuotationTest extends TestCase
             'rejected_by' => 1,
             'rejected_at' => now()->toDateTimeString(),
             'rejection_reason' => 'Too high',
+            'customer_approved_by' => 1,
+            'customer_approved_at' => now()->toDateTimeString(),
+            'customer_rejected_by' => 1,
+            'customer_rejected_at' => now()->toDateTimeString(),
+            'customer_rejection_reason' => 'Too expensive',
         ]);
         $item = new QuotationItem([
             'line_total' => '999.00',
@@ -210,6 +215,11 @@ class QuotationTest extends TestCase
         $this->assertNull($quotation->rejected_by);
         $this->assertNull($quotation->rejected_at);
         $this->assertNull($quotation->rejection_reason);
+        $this->assertNull($quotation->customer_approved_by);
+        $this->assertNull($quotation->customer_approved_at);
+        $this->assertNull($quotation->customer_rejected_by);
+        $this->assertNull($quotation->customer_rejected_at);
+        $this->assertNull($quotation->customer_rejection_reason);
         $this->assertNull($item->line_total);
     }
 

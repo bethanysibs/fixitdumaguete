@@ -112,6 +112,10 @@
                         </div>
                     @endif
 
+                    @if (! empty($customerCanReviewQuotation))
+                        <p class="mt-4"><a href="{{ route('bookings.quotation.show', $booking) }}">Review the quotation</a></p>
+                    @endif
+
                     @if (auth()->id() === $booking->customer_id && $booking->status === 'pending' && $booking->payment === null)
                         <div class="payment-panel mt-4">
                             <h2 class="h5">Record payment</h2>

@@ -67,6 +67,34 @@
                 <dd>{{ $quotation->rejection_reason }}</dd>
             </div>
         @endif
+        @if ($quotation->customer_approved_at)
+            <div>
+                <dt>Accepted by the customer</dt>
+                <dd>
+                    {{ $quotation->customer_approved_at->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+                    @if ($quotation->customerAccepter)
+                        · {{ $quotation->customerAccepter->name }}
+                    @endif
+                </dd>
+            </div>
+        @endif
+        @if ($quotation->customer_rejected_at)
+            <div>
+                <dt>Declined by the customer</dt>
+                <dd>
+                    {{ $quotation->customer_rejected_at->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+                    @if ($quotation->customerRejector)
+                        · {{ $quotation->customerRejector->name }}
+                    @endif
+                </dd>
+            </div>
+        @endif
+        @if ($quotation->customer_rejection_reason)
+            <div>
+                <dt>Customer rejection reason</dt>
+                <dd>{{ $quotation->customer_rejection_reason }}</dd>
+            </div>
+        @endif
         @if ($quotation->notes)
             <div>
                 <dt>Notes</dt>

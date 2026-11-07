@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\QuotationController as AdminQuotationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\CustomerQuotationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MapLookupController;
 use App\Http\Controllers\ServiceCategoryController;
@@ -63,6 +64,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/maps/reverse', [MapLookupController::class, 'reverse'])->middleware('throttle:30,1')->name('maps.reverse');
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::get('/bookings/{booking}', [BookingController::class, 'show'])->name('bookings.show');
+    Route::get('/bookings/{booking}/quotation', [CustomerQuotationController::class, 'show'])->name('bookings.quotation.show');
+    Route::get('/bookings/{booking}/quotation/accept', [CustomerQuotationController::class, 'confirm'])->name('bookings.quotation.confirm');
+    Route::post('/bookings/{booking}/quotation/accept', [CustomerQuotationController::class, 'accept'])->name('bookings.quotation.accept');
+    Route::post('/bookings/{booking}/quotation/reject', [CustomerQuotationController::class, 'reject'])->name('bookings.quotation.reject');
     Route::get('/bookings/{booking}/photos/{photo}', [BookingController::class, 'photo'])->name('bookings.photos.show');
     Route::post('/bookings/{booking}/pay', [BookingController::class, 'pay'])->name('bookings.pay');
     Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel'])->name('bookings.cancel');

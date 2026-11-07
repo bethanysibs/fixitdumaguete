@@ -131,7 +131,7 @@ class QuotationController extends Controller
         abort_unless($booking->allowsNewQuotation(), 403);
 
         $quotation = $booking->currentQuotation()->with('items')->first();
-        abort_unless($quotation !== null && in_array($quotation->status, ['submitted', 'admin_approved'], true), 403);
+        abort_unless($quotation !== null && in_array($quotation->status, ['submitted', 'admin_approved', 'approved'], true), 403);
 
         return $quotation;
     }

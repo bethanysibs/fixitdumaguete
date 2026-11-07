@@ -24,6 +24,7 @@ class Quotation extends Model
         'approved',
         'admin_approved',
         'rejected',
+        'customer_rejected',
         'expired',
     ];
 
@@ -64,17 +65,42 @@ class Quotation extends Model
         return $this->belongsTo(User::class, 'rejected_by');
     }
 
+    public function customerAccepter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'customer_approved_by');
+    }
+
+    public function customerRejector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'customer_rejected_by');
+    }
+
+    public function visibleToCustomer(): bool
+    {
+        return in_array($this->status, ['admin_approved', 'approved', 'customer_rejected'], true);
+    }
+
     public function canBeRevisedByWorker(): bool
     {
         if (! $this->is_current) {
             return false;
         }
 
-        if ($this->status === 'rejected') {
+        if (in_array($this->status, ['rejected', 'customer_rejected'], true)) {
             return true;
         }
 
         return $this->status === 'submitted' && ! $this->is_admin_adjustment;
+    }
+
+    public function customerStatusLabel(): string
+    {
+        return match ($this->status) {
+            'admin_approved' => 'Ready for your review',
+            'approved' => 'Accepted',
+            'customer_rejected' => 'Declined',
+            default => $this->statusLabel(),
+        };
     }
 
     public function statusLabel(): string
@@ -83,9 +109,10 @@ class Quotation extends Model
             'draft' => 'Draft',
             'submitted' => 'Submitted',
             'superseded' => 'Superseded',
-            'approved' => 'Approved',
+            'approved' => 'Accepted by the customer',
             'admin_approved' => 'Approved for customer review',
             'rejected' => 'Rejected',
+            'customer_rejected' => 'Declined by the customer',
             'expired' => 'Expired',
             default => $this->status,
         };
@@ -112,6 +139,8 @@ class Quotation extends Model
             'submitted_at' => 'datetime',
             'admin_approved_at' => 'datetime',
             'rejected_at' => 'datetime',
+            'customer_approved_at' => 'datetime',
+            'customer_rejected_at' => 'datetime',
         ];
     }
 }

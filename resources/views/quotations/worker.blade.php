@@ -44,6 +44,25 @@
     </div>
 @elseif ($current && $current->status === 'admin_approved')
     <div class="alert alert-info mt-3" role="status">An administrator approved this quotation for customer review. It cannot be edited.</div>
+@elseif ($current && $current->status === 'approved')
+    <div class="alert alert-info mt-3" role="status">
+        The customer accepted this quotation
+        @if ($current->customer_approved_at)
+            on {{ $current->customer_approved_at->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+        @endif
+        . It cannot be edited.
+    </div>
+@elseif ($current && $current->status === 'customer_rejected')
+    <div class="alert alert-info mt-3" role="status">
+        The customer declined this quotation
+        @if ($current->customer_rejected_at)
+            on {{ $current->customer_rejected_at->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+        @endif
+        .
+        @if ($current->customer_rejection_reason)
+            Reason: {{ $current->customer_rejection_reason }}
+        @endif
+    </div>
 @elseif ($current && $current->status === 'rejected')
     <div class="alert alert-info mt-3" role="status">
         An administrator rejected this quotation.
@@ -110,6 +129,8 @@
         @csrf
         @if ($current->status === 'rejected')
             <p>A revision keeps this rejected quotation and opens a new draft.</p>
+        @elseif ($current->status === 'customer_rejected')
+            <p>A revision keeps this declined quotation and opens a new draft.</p>
         @else
             <p>A revision keeps version {{ $current->version_number }} as it was submitted and opens a new draft.</p>
         @endif

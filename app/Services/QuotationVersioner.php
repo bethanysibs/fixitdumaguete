@@ -262,6 +262,47 @@ class QuotationVersioner
         });
     }
 
+    public function acceptByCustomer(Quotation $quotation, int $customerId, int $versionNumber): Quotation
+    {
+        return DB::transaction(function () use ($quotation, $customerId, $versionNumber) {
+            $this->lockBooking($quotation->booking_id);
+            $quotation->refresh();
+            $this->ensureCustomerCanDecide($quotation, $versionNumber);
+
+            $quotation->status = 'approved';
+            $quotation->customer_approved_by = $customerId;
+            $quotation->customer_approved_at = now();
+            $quotation->save();
+
+            return $quotation->load('items');
+        });
+    }
+
+    public function rejectByCustomer(Quotation $quotation, int $customerId, int $versionNumber, string $reason): Quotation
+    {
+        $reason = $this->boundedText($reason, 'customer_rejection_reason');
+
+        if ($reason === null) {
+            throw ValidationException::withMessages([
+                'customer_rejection_reason' => 'Enter a reason for declining this quotation.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($quotation, $customerId, $versionNumber, $reason) {
+            $this->lockBooking($quotation->booking_id);
+            $quotation->refresh();
+            $this->ensureCustomerCanDecide($quotation, $versionNumber);
+
+            $quotation->status = 'customer_rejected';
+            $quotation->customer_rejected_by = $customerId;
+            $quotation->customer_rejected_at = now();
+            $quotation->customer_rejection_reason = $reason;
+            $quotation->save();
+
+            return $quotation->load('items');
+        });
+    }
+
     private function ensureCurrentDraft(Quotation $quotation): void
     {
         if ($quotation->status !== 'draft' || ! $quotation->is_current) {
@@ -282,9 +323,30 @@ class QuotationVersioner
 
     private function ensureAdjustable(Quotation $quotation): void
     {
-        if (! $quotation->is_current || ! in_array($quotation->status, ['submitted', 'admin_approved'], true)) {
+        if (! $quotation->is_current || ! in_array($quotation->status, ['submitted', 'admin_approved', 'approved'], true)) {
             throw ValidationException::withMessages([
                 'quotation' => 'Adjust the current submitted quotation.',
+            ]);
+        }
+    }
+
+    private function ensureCustomerCanDecide(Quotation $quotation, int $versionNumber): void
+    {
+        $this->ensureBookingCanBeReviewed($quotation->booking_id);
+
+        if ($versionNumber !== $quotation->version_number) {
+            throw ValidationException::withMessages([
+                'version_number' => 'This quotation changed. Review it again before deciding.',
+            ]);
+        }
+
+        if (! $quotation->is_current
+            || $quotation->status !== 'admin_approved'
+            || $quotation->admin_approved_at === null
+            || $quotation->customer_approved_at !== null
+            || $quotation->customer_rejected_at !== null) {
+            throw ValidationException::withMessages([
+                'quotation' => 'Accept or decline the current quotation approved for your review.',
             ]);
         }
     }
